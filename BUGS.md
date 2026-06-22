@@ -184,3 +184,31 @@ alone, without the original session's context.
   `import habanero` + `_find_dylib()` resolves the local build path; `make test-deploy`
   injected on iPhone 15 (E4B5752B, 26.5), `habanero-ctl --port 8869 ping` → `pong`,
   `look` → full screen dump.
+
+### BUG-005 — CI ruff step omits `habanero/`, so package lint issues escape CI
+- **Status:** FIXED (branch `fix/bug-005-ci-lint-scope`)
+- **Severity:** low
+- **Area:** `.github/workflows/ci.yml` (lint job), `habanero/pepper_format.py`
+- **Filed:** 2026-06-22
+- **Symptom:** CI's "Lint Python (ruff)" step ran `ruff check tools/
+  scripts/gen-coverage.py scripts/gen-pepper-commands.py` — it did not lint the
+  `habanero/` package, while `make lint-py` and `scripts/pre-commit` both do. So
+  3 pre-existing `E501` in `habanero/pepper_format.py` (lines 407, 616, 973; 152 > 120)
+  were green on CI but red on `make lint-py`; future `habanero/` lint regressions
+  would slip CI entirely.
+- **Expected:** CI lints the same scope as the local gates and the repo stays lint-clean.
+- **Fix:**
+  - Widened the `ci.yml` ruff invocation to `ruff check habanero/ tools/
+    scripts/gen-coverage.py scripts/gen-pepper-commands.py` so it matches `make lint-py`.
+  - Wrapped the 3 long string literals in `pepper_format.py` (the identical
+    `system_dialog_probe_inconclusive` message in `format_look` / `format_look_slim` /
+    `format_look_compact`) under 120 cols via implicit string concatenation — the
+    runtime string is byte-identical, no content changed.
+  - Added regression test `tools/tests/test_ci_lint_scope.py` (asserts the `ci.yml`
+    ruff scope includes `habanero/` and is a superset of the `make lint-py` scope —
+    so anything linted locally is also linted on CI — and that the wrapped probe line
+    stays byte-identical at all 3 formatters).
+- **Verified green:** `make lint-py` 0 errors (was `Found 3 errors`); `ruff check
+  habanero/ tools/ scripts/gen-coverage.py scripts/gen-pepper-commands.py` clean;
+  full `make py-test` 158 passed (155 baseline + 3 new, incl. `test_pepper_format.py`
+  unchanged); `make typecheck` 0 errors; `make build` ok.
