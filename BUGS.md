@@ -52,6 +52,23 @@ alone, without the original session's context.
   atomic "deep rename" change, not piecemeal. Low-risk subset that can land first:
   argparse `prog=`/description strings + user-facing log text.
 
+### BUG-003 — No dev-dependency spec: documented test/lint gates fail out-of-box
+- **Status:** OPEN
+- **Severity:** low
+- **Area:** `pyproject.toml` / `requirements.txt`, `Makefile` (`py-test`/`lint-py`/`check`), README
+- **Filed:** 2026-06-22
+- **Symptom:** a fresh contributor can't run the documented quality gates: `make
+  py-test` → `No module named pytest`, `make lint-py` → `ruff: command not found`,
+  `make typecheck` needs pyright. None of pytest/ruff/pyright are declared anywhere
+  (`requirements.txt` is runtime-only: `mcp` / `textual` / `websockets`).
+- **Repro:** clean clone → `make py-test` (or `make check`) without a manually
+  pre-provisioned dev toolchain.
+- **Expected:** one documented step installs the dev toolchain so the Makefile gates run.
+- **Notes:** found while verifying BUG-001 (had to hand-provision a throwaway venv
+  with pytest to run the suite). Fix: add `[project.optional-dependencies] dev =
+  ["pytest", "ruff", "pyright"]` (or a `requirements-dev.txt`) and point the
+  Makefile/README at it (`pip install -e ".[dev]"`). Pin versions for reproducibility.
+
 ## Fixed
 
 ### BUG-001 — Source / editable install fails: force-include of gitignored `.claude/skills`
