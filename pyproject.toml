@@ -16,6 +16,17 @@ dependencies = [
     "websockets>=12.0",
 ]
 
+# Toolchain for the documented quality gates (`make py-test` / `lint-py` /
+# `typecheck`). Install with `pip install -e ".[dev]"`. Compatible-release pins
+# (`~=`) keep the gates reproducible — notably ruff, whose minor bumps add lint
+# rules that would otherwise break `make lint-py` out from under a clean checkout.
+[project.optional-dependencies]
+dev = [
+    "pytest~=9.1.1",
+    "ruff~=0.15.18",
+    "pyright~=1.1.410",
+]
+
 [project.scripts]
 habanero-mcp = "habanero.mcp_server:main"
 habanero-ctl = "habanero.ctl:main"

@@ -102,4 +102,13 @@ Because it runs in-process, Habanero has access to the full view hierarchy, the 
 
 ## Development
 
+Install the dev toolchain (pytest, ruff, pyright) in one step, then run the gates:
+
+```bash
+pip install -e ".[dev]"   # editable install + quality-gate toolchain
+make py-test              # Python unit tests (tools/tests/)
+make lint-py              # ruff lint
+make typecheck            # pyright type check
+```
+
 [`dylib/DYLIB.md`](dylib/DYLIB.md) — architecture and adding commands · [`tools/TOOLS.md`](tools/TOOLS.md) — MCP tool layer · [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) — common issues
