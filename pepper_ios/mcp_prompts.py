@@ -28,12 +28,13 @@ _SKILLS = [
 def _read_skill(dirname: str) -> str | None:
     """Read a SKILL.md file, stripping YAML frontmatter. Returns None if not found.
 
-    Tries package data first (installed wheel), then falls back to the repo's
-    .claude/skills/ directory (dev checkout).
+    Resolves the tracked package data first (`pepper_ios/skills/<dir>/SKILL.md`,
+    bundled into the wheel), then falls back to a dev checkout's
+    `.claude/skills/` directory for parity with upstream layouts.
     """
     text: str | None = None
 
-    # Package data (bundled via pyproject.toml force-include)
+    # Package data: tracked in-repo at pepper_ios/skills/, bundled into the wheel.
     try:
         pkg_skill = resources.files("pepper_ios") / "skills" / dirname / "SKILL.md"
         if pkg_skill.is_file():
