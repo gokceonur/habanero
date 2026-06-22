@@ -145,7 +145,7 @@ def _xcframework_sim_search_paths(products_dir: str) -> list[tuple[str | None, s
     - Framework slice: <slice>/Foo.framework → add <slice> as -F
     - Bare-headers slice: <slice>/Headers/module.modulemap → add <slice>/Headers as -I
 
-    products_dir is .../Build/Products/Debug-iphonesimulator; SourcePackages
+    products_dir is .../Build/Products/<Config>-iphonesimulator; SourcePackages
     is a sibling of Build.
     """
     results: list[tuple[str | None, str | None]] = []
@@ -184,21 +184,36 @@ def _xcframework_sim_search_paths(products_dir: str) -> list[tuple[str | None, s
     return results
 
 
+def _sim_products_dirs(base: str) -> list[str]:
+    """Return every Build/Products/*-iphonesimulator dir directly under *base*.
+
+    Globs all simulator product dirs, not just Debug-iphonesimulator: a scheme
+    can map to any build configuration, so the built .swiftmodule lands in
+    <Config>-iphonesimulator (e.g. the Shift "Shift Dev" scheme → "Dev" config
+    → Dev-iphonesimulator). Hardcoding the Debug- prefix missed those builds
+    entirely (BUG-007).
+    """
+    products = os.path.join(base, "Build", "Products")
+    found = []
+    try:
+        for entry in os.scandir(products):
+            if entry.is_dir() and entry.name.endswith("-iphonesimulator"):
+                found.append(entry.path)
+    except OSError:
+        pass
+    return found
+
+
 def _find_all_products_dirs(dd_root: str) -> list[str]:
-    """Find all Build/Products/Debug-iphonesimulator dirs under a DerivedData root."""
+    """Find all Build/Products/*-iphonesimulator dirs under a DerivedData root."""
     results = []
-    # Check if dd_root itself has Build/Products (worktree-isolated DerivedData)
-    direct = os.path.join(dd_root, "Build", "Products", "Debug-iphonesimulator")
-    if os.path.isdir(direct):
-        results.append(direct)
-    # DerivedData structure: DerivedData/ProjectName-hash/Build/Products/Debug-iphonesimulator/
+    # dd_root itself may hold Build/Products (worktree-isolated DerivedData)
+    results.extend(_sim_products_dirs(dd_root))
+    # DerivedData structure: DerivedData/ProjectName-hash/Build/Products/<Config>-iphonesimulator/
     try:
         for entry in os.scandir(dd_root):
-            if not entry.is_dir():
-                continue
-            products = os.path.join(entry.path, "Build", "Products", "Debug-iphonesimulator")
-            if os.path.isdir(products):
-                results.append(products)
+            if entry.is_dir():
+                results.extend(_sim_products_dirs(entry.path))
     except OSError:
         pass
     return results
