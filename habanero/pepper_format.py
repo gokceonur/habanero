@@ -404,7 +404,10 @@ def format_look(resp: dict) -> str:
         lines.append("  Do NOT tap buttons directly — they are in SpringBoard, not the app.")
         lines.append("")
     elif data.get("system_dialog_unknown"):
-        lines.append("  ⚠ system_dialog_probe_inconclusive — Simulator.app is backgrounded; focus it and re-run app_look if you expect a system dialog")
+        lines.append(
+            "  ⚠ system_dialog_probe_inconclusive — Simulator.app is backgrounded; "
+            "focus it and re-run app_look if you expect a system dialog"
+        )
         lines.append("")
 
     # Interactive rows
@@ -613,7 +616,10 @@ def format_look_slim(resp: dict) -> str:
         lines.append("  Do NOT tap buttons directly — they are in SpringBoard, not the app.")
         lines.append("")
     elif data.get("system_dialog_unknown"):
-        lines.append("  ⚠ system_dialog_probe_inconclusive — Simulator.app is backgrounded; focus it and re-run app_look if you expect a system dialog")
+        lines.append(
+            "  ⚠ system_dialog_probe_inconclusive — Simulator.app is backgrounded; "
+            "focus it and re-run app_look if you expect a system dialog"
+        )
         lines.append("")
 
     # Interactive elements — flat list, no y-range headers
@@ -970,7 +976,10 @@ def format_look_compact(resp: dict) -> str:
         lines.append("  USE THIS COMMAND → dialog dismiss_system")
         lines.append("  Do NOT tap buttons directly — they are in SpringBoard, not the app.")
     elif data.get("system_dialog_unknown"):
-        lines.append("  ⚠ system_dialog_probe_inconclusive — Simulator.app is backgrounded; focus it and re-run app_look if you expect a system dialog")
+        lines.append(
+            "  ⚠ system_dialog_probe_inconclusive — Simulator.app is backgrounded; "
+            "focus it and re-run app_look if you expect a system dialog"
+        )
 
     # Interactive elements
     if screen_changed or not prev_fp:

@@ -37,7 +37,7 @@ jobs:
       - name: Lint Python (ruff)
         run: |
           pip install ruff --quiet
-          ruff check tools/ scripts/gen-coverage.py scripts/gen-pepper-commands.py
+          ruff check habanero/ tools/ scripts/gen-coverage.py scripts/gen-pepper-commands.py
 
       - name: Check MCP tool coverage
         run: bash scripts/check-tool-coverage.sh
