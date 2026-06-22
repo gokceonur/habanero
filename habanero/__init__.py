@@ -32,11 +32,6 @@ def _find_dylib() -> str:
     if dev_dylib.is_file():
         return str(dev_dylib)
 
-    # 4. Auto-download from GitHub Releases (pip installs)
-    try:
-        from .dylib_fetch import ensure_dylib
-        return ensure_dylib()
-    except Exception:
-        pass
-
+    # Not found. This private fork ships no prebuilt dylib (no PyPI package, no
+    # published Releases) — build it from source with `make build`.
     return ""
