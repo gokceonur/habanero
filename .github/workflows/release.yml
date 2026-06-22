@@ -19,7 +19,7 @@ jobs:
       - name: Verify version matches tag
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
-          PKG_VERSION=$(python3 -c "from pepper_ios import __version__; print(__version__)")
+          PKG_VERSION=$(python3 -c "from habanero import __version__; print(__version__)")
           if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
             echo "::error::Tag $TAG_VERSION doesn't match package version $PKG_VERSION"
             exit 1
@@ -29,17 +29,17 @@ jobs:
         run: bash tools/build-dylib.sh
 
       - name: Package framework
-        run: cd build && zip -r Pepper.framework.zip Pepper.framework/
+        run: cd build && zip -r Habanero.framework.zip Habanero.framework/
 
       - name: Create GitHub Release (private)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
-            --title "Pepper $GITHUB_REF_NAME" \
+            --title "Habanero $GITHUB_REF_NAME" \
             --generate-notes \
-            build/Pepper.framework.zip 2>/dev/null \
-          || gh release upload "$GITHUB_REF_NAME" build/Pepper.framework.zip --clobber
+            build/Habanero.framework.zip 2>/dev/null \
+          || gh release upload "$GITHUB_REF_NAME" build/Habanero.framework.zip --clobber
 
       - name: Create GitHub Release (public)
         env:
@@ -48,10 +48,10 @@ jobs:
           # Wait for mirror to push the tag to public repo
           for i in 1 2 3 4 5; do
             if gh release create "$GITHUB_REF_NAME" \
-              --repo skwallace36/Pepper \
-              --title "Pepper $GITHUB_REF_NAME" \
+              --repo gokceonur/habanero \
+              --title "Habanero $GITHUB_REF_NAME" \
               --generate-notes \
-              build/Pepper.framework.zip 2>/dev/null; then
+              build/Habanero.framework.zip 2>/dev/null; then
               echo "Public release created"
               exit 0
             fi

@@ -1,5 +1,5 @@
 """
-Pepper common utilities — shared constants, config helpers, and port discovery.
+Habanero common utilities — shared constants, config helpers, and port discovery.
 
 Used by pepper-mcp, pepper-ctl, pepper-stream, and test-client.py.
 """
@@ -19,7 +19,26 @@ import sys
 # ---------------------------------------------------------------------------
 
 PEPPER_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ADAPTERS_DIR = os.path.join(os.path.expanduser("~"), ".pepper", "adapters")
+
+
+def habanero_home_dir(*parts: str) -> str:
+    """Resolve a path under the Habanero home dir, with legacy fallback.
+
+    Prefers the canonical ``~/.habanero/<parts...>``. If that exact subpath
+    doesn't exist yet but the legacy ``~/.pepper/<parts...>`` does, returns the
+    legacy path (read-both — this never moves or deletes the populated legacy
+    dir). New writes therefore land under ``~/.habanero`` while pre-existing
+    ``~/.pepper`` data (adapters, scripts, usage log) keeps resolving.
+    """
+    home = os.path.expanduser("~")
+    canonical = os.path.join(home, ".habanero", *parts)
+    legacy = os.path.join(home, ".pepper", *parts)
+    if not os.path.exists(canonical) and os.path.exists(legacy):
+        return legacy
+    return canonical
+
+
+ADAPTERS_DIR = habanero_home_dir("adapters")
 PORT_DIR = "/tmp/pepper-ports"
 DEVICE_DIR = "/tmp/pepper-devices"
 DEFAULT_HOST = "localhost"
@@ -32,7 +51,7 @@ def _find_dylib_default() -> str:
     if path:
         return path
     # Fallback to the conventional dev path (may not exist yet)
-    return os.path.join(PEPPER_DIR, "build", "Pepper.framework", "Pepper")
+    return os.path.join(PEPPER_DIR, "build", "Habanero.framework", "Habanero")
 
 
 def try_parse_json(value):
@@ -46,18 +65,18 @@ def try_parse_json(value):
         return value
 
 
-_PEPPER_DEBUG = os.environ.get("PEPPER_DEBUG")
+_HABANERO_DEBUG = os.environ.get("HABANERO_DEBUG") or os.environ.get("PEPPER_DEBUG")
 
 # Compact JSON kwargs — no whitespace.  Used for MCP tool responses.
 _COMPACT: dict = {"separators": (",", ":")}
-# Pretty JSON kwargs — indented for readability when PEPPER_DEBUG is set.
+# Pretty JSON kwargs — indented for readability when HABANERO_DEBUG is set.
 _PRETTY: dict = {"indent": 2}
 
-_DUMPS_KW: dict = _PRETTY if _PEPPER_DEBUG else _COMPACT
+_DUMPS_KW: dict = _PRETTY if _HABANERO_DEBUG else _COMPACT
 
 
 def json_dumps(obj: object) -> str:
-    """Serialize *obj* to JSON.  Compact by default; indented when PEPPER_DEBUG is set."""
+    """Serialize *obj* to JSON.  Compact by default; indented when HABANERO_DEBUG (or legacy PEPPER_DEBUG) is set."""
     return json.dumps(obj, **_DUMPS_KW)
 
 
@@ -133,12 +152,12 @@ def get_config() -> dict[str, str]:
 def resolve_adapter_dir(adapter_type: str | None = None) -> str | None:
     """Resolve adapter directory path.
 
-    Priority: ~/.pepper/adapters/{type}/ > ADAPTER_PATH from .env > None.
+    Priority: ~/.habanero/adapters/{type}/ (legacy ~/.pepper) > ADAPTER_PATH from .env > None.
     Returns absolute path or None for generic mode.
     """
     if not adapter_type or adapter_type == "generic":
         return None
-    # Check ~/.pepper/adapters/{type}/
+    # Check ~/.habanero/adapters/{type}/ (ADAPTERS_DIR handles legacy ~/.pepper)
     candidate = os.path.join(ADAPTERS_DIR, adapter_type)
     if os.path.isdir(candidate) and os.path.isfile(os.path.join(candidate, "config.json")):
         return candidate
@@ -153,7 +172,7 @@ def resolve_adapter_dir(adapter_type: str | None = None) -> str | None:
 def adapter_for_bundle_id(bundle_id: str) -> tuple[str, str] | None:
     """Reverse lookup: find adapter (name, path) by bundle_id.
 
-    Scans ~/.pepper/adapters/*/config.json for a matching bundle_id.
+    Scans ~/.habanero/adapters/*/config.json (legacy ~/.pepper) for a matching bundle_id.
     """
     if not bundle_id or not os.path.isdir(ADAPTERS_DIR):
         return None
@@ -192,7 +211,7 @@ def port_alive(port: int, host: str = "localhost", timeout: float = 1.0) -> bool
 
 
 def _bonjour_browse(timeout: float = 2.0) -> list[dict]:
-    """Browse for _pepper._tcp. Bonjour services using dns-sd (macOS).
+    """Browse for _habanero._tcp. Bonjour services using dns-sd (macOS).
 
     Returns list of dicts with 'host', 'port', 'name' keys.
     Falls back to empty list on non-macOS or if dns-sd is unavailable.
@@ -203,7 +222,7 @@ def _bonjour_browse(timeout: float = 2.0) -> list[dict]:
     # Step 1: browse for service instances
     try:
         proc = subprocess.Popen(
-            ["dns-sd", "-B", "_pepper._tcp.", "local."],
+            ["dns-sd", "-B", "_habanero._tcp.", "local."],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True,
@@ -216,10 +235,10 @@ def _bonjour_browse(timeout: float = 2.0) -> list[dict]:
     except OSError:
         return []
 
-    # Parse: "  Add        2   1 local.  _pepper._tcp.  Pepper-com.example.app"
+    # Parse: "  Add        2   1 local.  _habanero._tcp.  Habanero-com.example.app"
     names = []
     for line in browse_out.splitlines():
-        m = re.search(r"\bAdd\b.+?_pepper\._tcp\.\s+(.+)$", line)
+        m = re.search(r"\bAdd\b.+?_habanero\._tcp\.\s+(.+)$", line)
         if m:
             names.append(m.group(1).strip())
 
@@ -231,7 +250,7 @@ def _bonjour_browse(timeout: float = 2.0) -> list[dict]:
     for name in names:
         try:
             proc = subprocess.Popen(
-                ["dns-sd", "-L", name, "_pepper._tcp.", "local."],
+                ["dns-sd", "-L", name, "_habanero._tcp.", "local."],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
                 text=True,

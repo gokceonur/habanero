@@ -384,7 +384,7 @@ final class PepperSwiftUIBodyTracker {
 
             // Fast C-string check — avoids allocating a Swift String per image
             guard let imageName = _dyld_get_image_name(imageIndex) else { continue }
-            guard strstr(imageName, ".app/") != nil || strstr(imageName, "Pepper.framework") != nil else { continue }
+            guard strstr(imageName, ".app/") != nil || strstr(imageName, "Habanero.framework") != nil else { continue }
 
             var size: UInt = 0
             guard

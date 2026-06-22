@@ -29,9 +29,9 @@ final class DialogAutoDismisser {
     var delay: TimeInterval = 0.3
 
     /// Whether system dialog auto-dismiss is enabled.
-    /// Disabled only when `PEPPER_AUTO_DISMISS_DIALOGS=0`.
+    /// Disabled only when `HABANERO_AUTO_DISMISS_DIALOGS=0` (legacy `PEPPER_…=0`).
     var systemDismissEnabled: Bool {
-        ProcessInfo.processInfo.environment["PEPPER_AUTO_DISMISS_DIALOGS"] != "0"
+        habaneroEnv("AUTO_DISMISS_DIALOGS") != "0"
     }
 
     private init() {}

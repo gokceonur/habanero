@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Inject Pepper dylib environment variables into an Xcode scheme.
+Inject Habanero dylib environment variables into an Xcode scheme.
 
 Adds DYLD_INSERT_LIBRARIES and PEPPER_ADAPTER to the LaunchAction's
-EnvironmentVariables so that every Cmd+R in Xcode auto-injects Pepper.
+EnvironmentVariables so that every Cmd+R in Xcode auto-injects Habanero.
 
-Also adds a build pre-action that ensures the Pepper dylib exists.
+Also adds a build pre-action that ensures the Habanero dylib exists.
 
 Idempotent — safe to run multiple times. Checks for existing injection
 before modifying.
@@ -24,11 +24,11 @@ import subprocess
 import sys
 
 MARKER = "DYLD_INSERT_LIBRARIES"
-BUILD_MARKER = "Build Pepper dylib"
+BUILD_MARKER = "Build Habanero dylib"
 
 
 def detect_pepper_root():
-    """Auto-detect Pepper project root from this script's location."""
+    """Auto-detect Habanero project root from this script's location."""
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -45,13 +45,13 @@ def env_var_xml(key, value, enabled=True):
 
 
 def build_preaction_xml(pepper_root):
-    """Format the build pre-action that ensures the Pepper dylib exists."""
+    """Format the build pre-action that ensures the Habanero dylib exists."""
     # Escape for XML: use &#10; for newlines inside scriptText
     script = (
         f"# {BUILD_MARKER}&#10;"
-        f"PEPPER=&quot;{pepper_root}&quot;&#10;"
-        f"if [ ! -f &quot;$PEPPER/build/Pepper.framework/Pepper&quot; ]; then&#10;"
-        f"    make -C &quot;$PEPPER&quot; build 2&gt;&amp;1 || true&#10;"
+        f"HABANERO=&quot;{pepper_root}&quot;&#10;"
+        f"if [ ! -f &quot;$HABANERO/build/Habanero.framework/Habanero&quot; ]; then&#10;"
+        f"    make -C &quot;$HABANERO&quot; build 2&gt;&amp;1 || true&#10;"
         f"fi&#10;"
     )
     return (
@@ -78,7 +78,7 @@ def find_launch_action_range(content):
 
 
 def inject_env_vars(content, pepper_root, adapter):
-    """Inject Pepper env vars into the LaunchAction EnvironmentVariables."""
+    """Inject Habanero env vars into the LaunchAction EnvironmentVariables."""
     la_start, la_end = find_launch_action_range(content)
     if la_start is None:
         print("ERROR: No <LaunchAction> found in scheme", file=sys.stderr)
@@ -86,9 +86,11 @@ def inject_env_vars(content, pepper_root, adapter):
 
     la_section = content[la_start:la_end]
 
-    # Build the env var XML to insert
-    dylib_path = os.path.join(pepper_root, "build", "Pepper.framework", "Pepper")
+    # Build the env var XML to insert. Emit the canonical HABANERO_ADAPTER plus
+    # legacy PEPPER_ADAPTER for back-compat; the dylib reads HABANERO_* first.
+    dylib_path = os.path.join(pepper_root, "build", "Habanero.framework", "Habanero")
     new_vars = env_var_xml("DYLD_INSERT_LIBRARIES", dylib_path)
+    new_vars += env_var_xml("HABANERO_ADAPTER", adapter)
     new_vars += env_var_xml("PEPPER_ADAPTER", adapter)
 
     # Find </EnvironmentVariables> within LaunchAction
@@ -113,7 +115,7 @@ def inject_env_vars(content, pepper_root, adapter):
 
 
 def inject_build_preaction(content, pepper_root):
-    """Inject a build pre-action into LaunchAction that builds the Pepper dylib."""
+    """Inject a build pre-action into LaunchAction that builds the Habanero dylib."""
     la_start, la_end = find_launch_action_range(content)
     if la_start is None:
         return content
@@ -172,15 +174,15 @@ def remove_block(content, start_marker, end_tag):
 
 
 def remove_injection(content):
-    """Remove all Pepper-injected env vars and pre-actions."""
-    for key in ["DYLD_INSERT_LIBRARIES", "PEPPER_ADAPTER"]:
+    """Remove all Habanero-injected env vars and pre-actions (incl. legacy PEPPER_*)."""
+    for key in ["DYLD_INSERT_LIBRARIES", "HABANERO_ADAPTER", "PEPPER_ADAPTER"]:
         content = remove_block(content, f'key = "{key}"', "</EnvironmentVariable>")
     content = remove_block(content, f'title = "{BUILD_MARKER}"', "</ExecutionAction>")
     return content
 
 
 def inject_content(content, pepper_root, adapter):
-    """Inject Pepper env vars and build pre-action into scheme content string."""
+    """Inject Habanero env vars and build pre-action into scheme content string."""
     if MARKER in content:
         return content
     content = inject_env_vars(content, pepper_root, adapter)
@@ -192,10 +194,10 @@ def inject_content(content, pepper_root, adapter):
 
 
 def setup_filter(scheme_path, pepper_root, adapter):
-    """Configure git smudge/clean filter for transparent Pepper injection.
+    """Configure git smudge/clean filter for transparent Habanero injection.
 
-    After this, git sees the clean (no-Pepper) version in the index while
-    the working copy has Pepper injected.  Legitimate scheme changes commit
+    After this, git sees the clean (no-Habanero) version in the index while
+    the working copy has Habanero injected.  Legitimate scheme changes commit
     normally — no assume-unchanged / skip-worktree needed.
     """
     inject_script = os.path.abspath(__file__)
@@ -256,14 +258,14 @@ def setup_filter(scheme_path, pepper_root, adapter):
             f.write(injected)
 
     print(f"Configured smudge/clean filter for {rel_path}")
-    print("  Working copy: Pepper injected")
-    print("  Git index: clean (no Pepper)")
+    print("  Working copy: Habanero injected")
+    print("  Git index: clean (no Habanero)")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Inject Pepper into Xcode scheme")
+    parser = argparse.ArgumentParser(description="Inject Habanero into Xcode scheme")
     parser.add_argument("scheme", nargs="?", help="Path to .xcscheme file")
-    parser.add_argument("--pepper-root", help="Pepper project root (auto-detected)")
+    parser.add_argument("--pepper-root", help="Habanero project root (auto-detected)")
     parser.add_argument("--adapter", default="generic", help="Adapter type (default: generic)")
     parser.add_argument("--remove", action="store_true", help="Remove injection")
     parser.add_argument(
@@ -313,7 +315,7 @@ def main():
         content = remove_injection(content)
         with open(scheme_path, "w") as f:
             f.write(content)
-        print(f"Removed Pepper injection from {scheme_path}")
+        print(f"Removed Habanero injection from {scheme_path}")
         return
 
     # Check if already injected
@@ -328,8 +330,8 @@ def main():
     with open(scheme_path, "w") as f:
         f.write(content)
 
-    print(f"Injected Pepper into {scheme_path}")
-    print(f"  dylib: {pepper_root}/build/Pepper.framework/Pepper")
+    print(f"Injected Habanero into {scheme_path}")
+    print(f"  dylib: {pepper_root}/build/Habanero.framework/Habanero")
     print(f"  adapter: {args.adapter}")
 
 

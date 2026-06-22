@@ -1,14 +1,14 @@
 import Foundation
 
-/// Advertises the Pepper WebSocket server via Bonjour (mDNS/DNS-SD)
+/// Advertises the Habanero WebSocket server via Bonjour (mDNS/DNS-SD)
 /// so that hosts on the local network can discover it without knowing the port.
 ///
-/// Service type: `_pepper._tcp.`
-/// TXT record includes the bundle ID for filtering when multiple apps run Pepper.
+/// Service type: `_habanero._tcp.`
+/// TXT record includes the bundle ID for filtering when multiple apps run Habanero.
 final class PepperBonjourAdvertiser: NSObject, NetServiceDelegate {
 
     /// Bonjour service type used for discovery.
-    static let serviceType = "_pepper._tcp."
+    static let serviceType = "_habanero._tcp."
 
     private var netService: NetService?
     private let port: UInt16
@@ -23,8 +23,8 @@ final class PepperBonjourAdvertiser: NSObject, NetServiceDelegate {
     ///   - txtData: Extra metadata published in the DNS-SD TXT record.
     init(port: UInt16, serviceName: String? = nil, txtData: [String: String] = [:]) {
         self.port = port
-        let bundleID = Bundle.main.bundleIdentifier ?? "com.pepper.unknown"
-        self.serviceName = serviceName ?? "Pepper-\(bundleID)"
+        let bundleID = Bundle.main.bundleIdentifier ?? "com.habanero.unknown"
+        self.serviceName = serviceName ?? "Habanero-\(bundleID)"
         var txt = txtData
         txt["bundleID"] = bundleID
         self.txtData = txt

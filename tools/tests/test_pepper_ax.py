@@ -13,7 +13,7 @@ import pytest
 if sys.platform != "darwin":
     pytest.skip("pepper_ax requires macOS", allow_module_level=True)
 
-from pepper_ios.pepper_ax import _select_dialog_buttons  # noqa: E402
+from habanero.pepper_ax import _select_dialog_buttons  # noqa: E402
 
 # Each iOS screen rect: (x, y, w, h). One canonical 393x852 portrait phone.
 SCREEN = [(0.0, 0.0, 393.0, 852.0)]

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Thin wrapper for development — delegates to pepper_ios package.
+"""Thin wrapper for development — delegates to the habanero package.
 
 Run with --check to verify the MCP server can start and list tools
 without entering the stdio event loop (useful for diagnosing registration
@@ -30,7 +30,7 @@ def _check():
 
     # 3. Try importing the MCP server (registers all tools at import time)
     try:
-        from pepper_ios import mcp_server  # noqa: F401
+        from habanero import mcp_server  # noqa: F401
     except Exception as e:
         errors.append(f"Import failed: {e}")
         for err in errors:
@@ -47,7 +47,7 @@ def _check():
             print(f"FAIL  {err}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"OK  pepper MCP server ready — {tool_count} tools registered")
+    print(f"OK  habanero MCP server ready — {tool_count} tools registered")
     sys.exit(0)
 
 
@@ -55,7 +55,7 @@ if "--check" in sys.argv:
     _check()
 else:
     try:
-        from pepper_ios.mcp_server import main
+        from habanero.mcp_server import main
     except Exception as e:
         # Surface import errors clearly on stderr so MCP clients can log them
         print(f"pepper-mcp: failed to start — {e}", file=sys.stderr)

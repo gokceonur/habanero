@@ -1,4 +1,4 @@
-"""pepper_websocket -- shared WebSocket communication for Pepper tools.
+"""pepper_websocket -- shared WebSocket communication for Habanero tools.
 
 Provides make_command(), recv_response(), and send_command() used by
 pepper-mcp, pepper-ctl, pepper-stream, and test-client.py.
@@ -12,7 +12,7 @@ import uuid
 
 from .pepper_ws_raw import RawWebSocket
 
-logger = logging.getLogger("pepper_ws")
+logger = logging.getLogger("habanero_ws")
 
 # Retryable errors: transient connection problems where the server may
 # come back (e.g. app backgrounded briefly, network hiccup).

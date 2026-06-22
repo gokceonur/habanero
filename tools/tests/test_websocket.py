@@ -8,8 +8,8 @@ from unittest.mock import patch
 
 import pytest
 
-import pepper_ios.pepper_websocket as ws
-from pepper_ios.pepper_websocket import CrashError, _send_with_retry, make_command
+import habanero.pepper_websocket as ws
+from habanero.pepper_websocket import CrashError, _send_with_retry, make_command
 
 # ---------------------------------------------------------------------------
 # make_command
@@ -169,7 +169,7 @@ class TestMonitorStateReset:
 
     def test_reset_clears_known_monitors(self):
         """reset_monitor_state sets _known_active_monitors back to None."""
-        import pepper_ios.mcp_server as srv
+        import habanero.mcp_server as srv
 
         # Simulate a previous session that discovered active monitors
         srv._known_active_monitors = frozenset({"network", "console"})
@@ -180,7 +180,7 @@ class TestMonitorStateReset:
 
     def test_reset_is_idempotent(self):
         """Calling reset when already None is a no-op."""
-        import pepper_ios.mcp_server as srv
+        import habanero.mcp_server as srv
 
         srv._known_active_monitors = None
         srv.reset_monitor_state()  # should not raise
@@ -222,7 +222,7 @@ class TestMcpSendCommand:
 
     def test_connection_refused_returns_error_dict(self):
         """ConnectionRefusedError returns a structured error dict."""
-        import pepper_ios.mcp_server as srv
+        import habanero.mcp_server as srv
 
         async def run():
             with patch.object(ws, "_send_with_retry", side_effect=ConnectionRefusedError("refused")):
@@ -234,7 +234,7 @@ class TestMcpSendCommand:
 
     def test_crash_error_returns_error_dict(self):
         """CrashError returns a structured error dict with crash info."""
-        import pepper_ios.mcp_server as srv
+        import habanero.mcp_server as srv
 
         async def run():
             with patch.object(ws, "_send_with_retry", side_effect=CrashError("tap")):
@@ -246,7 +246,7 @@ class TestMcpSendCommand:
 
     def test_timeout_returns_error_dict(self):
         """Timeout returns a structured error dict."""
-        import pepper_ios.mcp_server as srv
+        import habanero.mcp_server as srv
 
         async def run():
             with patch.object(ws, "_send_with_retry", side_effect=asyncio.TimeoutError()):

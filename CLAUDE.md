@@ -1,14 +1,14 @@
-# pepper
+# habanero
 
-Pepper is a dylib injected into iOS simulator apps via `DYLD_INSERT_LIBRARIES`. It starts a WebSocket server inside the app process; MCP server and CLI tools connect to it. No source patches needed.
+Habanero is a dylib injected into iOS simulator apps via `DYLD_INSERT_LIBRARIES`. It starts a WebSocket server inside the app process; MCP server and CLI tools connect to it. No source patches needed.
 
 Source of truth for dylib code is `dylib/`. Config via `.env` (see `.env.example`). Run `make help` for all targets.
 
-**Adapters** are optional app-specific modules (deep link routes, icon mappings, custom tools) compiled alongside the dylib. Set `APP_ADAPTER_TYPE` and `ADAPTER_PATH` in `.env`. Without an adapter, Pepper runs in generic mode.
+**Adapters** are optional app-specific modules (deep link routes, icon mappings, custom tools) compiled alongside the dylib. Set `APP_ADAPTER_TYPE` and `ADAPTER_PATH` in `.env`. Without an adapter, Habanero runs in generic mode.
 
 ## MCP Tools
 
-Tool definitions live in `pepper_ios/mcp_tools_*.py` modules. `.mcp.json` configures how to launch the MCP server; `tools/pepper-mcp` is the entry script. `app_look` is the primary observation tool. It sends the `introspect` command with `mode=map`.
+Tool definitions live in `habanero/mcp_tools_*.py` modules. `.mcp.json` configures how to launch the MCP server; `tools/pepper-mcp` is the entry script. `app_look` is the primary observation tool. It sends the `introspect` command with `mode=map`.
 
 app_look, app_build, app_build_hw, app_status, app_record, app_snapshot, app_console, app_network, app_debug, app_perf, app_swiftui, app_automation, app_eval, ui_tap, ui_scroll, ui_swipe, ui_input, ui_toggle, ui_gesture, ui_query, ui_accessibility, nav_go, nav_back, nav_dismiss, nav_keyboard, nav_dialog, nav_screen, state_vars, state_tools, net_tools, sys_tools, sim_control, sim_raw
 

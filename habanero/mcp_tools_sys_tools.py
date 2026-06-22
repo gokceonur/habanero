@@ -51,7 +51,7 @@ Subcommands:
 - dynamic_type: Override font size for accessibility testing. Actions: current, set, reset, sizes
 - hook: Hook ObjC methods to log invocations. Actions: install, remove, remove_all, list, log, clear
 - frameworks: List loaded dylibs and frameworks. Actions: list, detail
-- usage: Show tool usage statistics from ~/.pepper/tool_usage.jsonl"""
+- usage: Show tool usage statistics from ~/.habanero/tool_usage.jsonl (legacy ~/.pepper)"""
 
         if command == "push":
             params: dict = {}

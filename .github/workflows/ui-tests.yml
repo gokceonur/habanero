@@ -29,7 +29,7 @@ jobs:
 
       - name: Run UI tests
         run: |
-          python3 -m pepper_ios.test_runner \
+          python3 -m habanero.test_runner \
             --file "${{ github.event.inputs.suite }}" \
             --project test-app/PepperTestApp.xcodeproj \
             --scheme PepperTestApp \

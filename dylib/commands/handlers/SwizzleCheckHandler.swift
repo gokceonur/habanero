@@ -22,7 +22,7 @@ struct SwizzleCheckHandler: PepperHandler {
 
     func handle(_ command: PepperCommand) throws -> PepperResponse {
         // If permission swizzles were skipped, report that instead of failing
-        if ProcessInfo.processInfo.environment["PEPPER_SKIP_PERMISSIONS"] == "1" {
+        if habaneroEnv("SKIP_PERMISSIONS") == "1" {
             return .result(
                 id: command.id,
                 [

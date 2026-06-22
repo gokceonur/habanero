@@ -171,7 +171,7 @@ if [ "$TOOL" = "Write" ] || [ "$TOOL" = "Edit" ]; then
 
   # Block generated files — these regenerate on merge to main, not in PRs.
   case "$FILE" in
-    */pepper_ios/pepper_commands.py|*/test-app/COVERAGE.md)
+    */habanero/pepper_commands.py|*/test-app/COVERAGE.md)
       deny "agents cannot modify $FILE (generated file — regenerates on merge to main)."
       ;;
   esac
@@ -195,8 +195,8 @@ if [ "$TOOL" = "Write" ] || [ "$TOOL" = "Edit" ]; then
       ;;
     bugfix)
       case "$FILE" in
-        */dylib/*|*/tools/*|*/scripts/*|*/pepper_ios/*) ;; # allowed
-        *) deny "bugfix agent cannot modify $FILE. Allowed: dylib/, tools/, scripts/, pepper_ios/" ;;
+        */dylib/*|*/tools/*|*/scripts/*|*/habanero/*) ;; # allowed
+        *) deny "bugfix agent cannot modify $FILE. Allowed: dylib/, tools/, scripts/, habanero/" ;;
       esac
       ;;
     researcher)
@@ -213,8 +213,8 @@ if [ "$TOOL" = "Write" ] || [ "$TOOL" = "Edit" ]; then
       ;;
     builder)
       case "$FILE" in
-        */dylib/*|*/tools/*|*/scripts/*|*/pepper_ios/*|*/test-app/*|*/Makefile) ;; # allowed
-        *) deny "builder agent cannot modify $FILE. Allowed: dylib/, tools/, scripts/, pepper_ios/, test-app/, Makefile" ;;
+        */dylib/*|*/tools/*|*/scripts/*|*/habanero/*|*/test-app/*|*/Makefile) ;; # allowed
+        *) deny "builder agent cannot modify $FILE. Allowed: dylib/, tools/, scripts/, habanero/, test-app/, Makefile" ;;
       esac
       ;;
     pr-verifier)

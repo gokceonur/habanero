@@ -158,21 +158,27 @@ fi
 pass "App is installed"
 
 # --- Step 2: Build dylib ---
-step "Building Pepper dylib"
+step "Building Habanero dylib"
 make -C "$PROJECT_DIR" build
-DYLIB_PATH="$PROJECT_DIR/build/Pepper.framework/Pepper"
+DYLIB_PATH="$PROJECT_DIR/build/Habanero.framework/Habanero"
 if [ ! -f "$DYLIB_PATH" ]; then
-    fail "Pepper.framework not found after build"
+    fail "Habanero.framework not found after build"
     exit 1
 fi
 pass "Dylib built"
 
-# --- Step 3: Launch with Pepper injected ---
-step "Launching app with Pepper injection"
+# --- Step 3: Launch with Habanero injected ---
+# Emit canonical HABANERO_* names plus legacy PEPPER_*; the dylib reads
+# HABANERO_* first and falls back to PEPPER_*.
+step "Launching app with Habanero injection"
 xcrun simctl terminate "$SIM_UDID" "$BUNDLE_ID" 2>/dev/null || true
 sleep 1
 
 SIMCTL_CHILD_DYLD_INSERT_LIBRARIES="$DYLIB_PATH" \
+SIMCTL_CHILD_HABANERO_PORT="$PORT" \
+SIMCTL_CHILD_HABANERO_SIM_UDID="$SIM_UDID" \
+SIMCTL_CHILD_HABANERO_ADAPTER="generic" \
+SIMCTL_CHILD_HABANERO_SKIP_PERMISSIONS="1" \
 SIMCTL_CHILD_PEPPER_PORT="$PORT" \
 SIMCTL_CHILD_PEPPER_SIM_UDID="$SIM_UDID" \
 SIMCTL_CHILD_PEPPER_ADAPTER="generic" \

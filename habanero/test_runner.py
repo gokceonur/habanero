@@ -1,9 +1,9 @@
-"""pepper test runner -- deterministic UI test flows via Pepper commands.
+"""habanero test runner -- deterministic UI test flows via Habanero commands.
 
 Runs sequential test steps (tap, scroll, verify, etc.) against a running
-Pepper instance. No LLM, no AI -- just command sequences like a real user.
+Habanero instance. No LLM, no AI -- just command sequences like a real user.
 
-Test files are YAML with sugar shortcuts for common Pepper commands.
+Test files are YAML with sugar shortcuts for common Habanero commands.
 See scripts/sample-flow.yaml for the format.
 """
 
@@ -89,7 +89,7 @@ def _expand_wait_for(v: dict) -> dict:
 
 
 def _expand_input(v: str | dict) -> dict:
-    """Expand input sugar into Pepper input command params.
+    """Expand input sugar into Habanero input command params.
 
     Supports:
       - input: "hello"              → types into focused field
@@ -120,7 +120,7 @@ def _expand_input(v: str | dict) -> dict:
     return params
 
 
-# Sugar keys that map to Pepper commands with shorthand params.
+# Sugar keys that map to Habanero commands with shorthand params.
 _SUGAR = {
     "tap": lambda v: ("tap", {"text": v} if isinstance(v, str) else
                        {"element": v["id"]} if "id" in v else v),
@@ -143,7 +143,7 @@ _SUGAR = {
     "dismiss_system": lambda _v: ("dismiss_system", {}),
 }
 
-# Keys reserved for step options, not Pepper command params.
+# Keys reserved for step options, not Habanero command params.
 _STEP_OPTS = {"timeout", "retry", "retry_delay"}
 
 
@@ -151,7 +151,7 @@ def expand_step(step: dict) -> tuple[str, str | None, dict, dict]:
     """Expand a step dict into (kind, cmd_or_shell, params, opts).
 
     kind: "pepper" or "shell"
-    cmd_or_shell: Pepper command name or shell command string
+    cmd_or_shell: Habanero command name or shell command string
     params: command params dict (empty for shell)
     opts: step-level overrides (timeout, retry, etc.)
     """
@@ -219,7 +219,7 @@ _READ_ONLY_CMDS = frozenset({
 
 def run_pepper_step(host: str, port: int, cmd: str, params: dict,
                     timeout: float) -> StepResult:
-    """Send a Pepper command and return a StepResult."""
+    """Send a Habanero command and return a StepResult."""
     msg = make_command(cmd, params or None)
     name = _step_label("pepper", cmd, params)
     t0 = time.monotonic()
@@ -629,12 +629,12 @@ def format_junit(result: SuiteResult) -> str:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="pepper-test",
-        description="Run deterministic UI test flows via Pepper.",
+        prog="habanero-test",
+        description="Run deterministic UI test flows via Habanero.",
     )
     parser.add_argument("--file", "-f", required=True, help="YAML test suite file")
-    parser.add_argument("--host", default=None, help="Pepper host (default: auto-discover)")
-    parser.add_argument("--port", type=int, default=None, help="Pepper port (default: auto-discover)")
+    parser.add_argument("--host", default=None, help="Habanero host (default: auto-discover)")
+    parser.add_argument("--port", type=int, default=None, help="Habanero port (default: auto-discover)")
     parser.add_argument(
         "--format", choices=["tap", "json", "junit"], default="tap",
         dest="report_format", help="Output format (default: tap)",
@@ -653,7 +653,7 @@ def build_parser() -> argparse.ArgumentParser:
     lifecycle.add_argument("--scheme", default=None, help="Xcode scheme (default: project name)")
     lifecycle.add_argument("--simulator", default=None, help="Simulator UDID (default: auto)")
     lifecycle.add_argument("--server-timeout", type=int, default=30,
-                           help="Seconds to wait for Pepper server (default: 30)")
+                           help="Seconds to wait for Habanero server (default: 30)")
     return parser
 
 
@@ -789,7 +789,7 @@ def main(argv: list[str] | None = None):
 
         sys.exit(0 if result.ok else 1)
 
-    # Attach mode: connect to already-running Pepper
+    # Attach mode: connect to already-running Habanero
     host = args.host or DEFAULT_HOST
     port = args.port
     if port is None:
@@ -797,7 +797,7 @@ def main(argv: list[str] | None = None):
             port = discover_port()
         except RuntimeError as e:
             print(f"Error: {e}", file=sys.stderr)
-            print("Specify --host and --port, or ensure a Pepper instance is running.", file=sys.stderr)
+            print("Specify --host and --port, or ensure a Habanero instance is running.", file=sys.stderr)
             sys.exit(2)
 
     result = run_suite(

@@ -1,8 +1,8 @@
-"""Script recording and replay engine for Pepper MCP.
+"""Script recording and replay engine for Habanero MCP.
 
 Records sequences of action tool calls and replays them as single operations.
-Scripts are stored as JSON in ~/.pepper/adapters/{type}/scripts/ or
-~/.pepper/scripts/{bundle_id}/ for generic mode.
+Scripts are stored as JSON in ~/.habanero/adapters/{type}/scripts/ or
+~/.habanero/scripts/{bundle_id}/ for generic mode (legacy ~/.pepper honored).
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import os
 import time
 from datetime import datetime, timezone
 
-from .pepper_common import get_config, resolve_adapter_dir
+from .pepper_common import get_config, habanero_home_dir, resolve_adapter_dir
 
 # Action tools that get recorded. Read-only tools (look, find, verify) are skipped.
 # These are dylib command names (not MCP tool names).
@@ -40,7 +40,7 @@ def scripts_dir() -> str:
         return os.path.join(adapter_dir, "scripts")
     # Generic mode: store by bundle_id
     bundle_id = ctx.get("bundle_id") or get_config().get("bundle_id", "unknown")
-    return os.path.join(os.path.expanduser("~"), ".pepper", "scripts", bundle_id)
+    return habanero_home_dir("scripts", bundle_id)
 
 
 def start_recording(name: str, description: str = "", sim_key: str = "default") -> str:

@@ -1,4 +1,4 @@
-"""Build, deploy, and iterate helpers for Pepper MCP.
+"""Build, deploy, and iterate helpers for Habanero MCP.
 
 Simulator resolution, xcodebuild invocation, app deployment with dylib injection,
 and physical device build/install/launch.
@@ -159,7 +159,7 @@ def resolve_simulator(simulator: str | None = None) -> str:
     1. Explicit param (always wins)
     2. Session affinity (reuse previously resolved sim for this process)
     3. Our existing session claim (from pepper_sessions)
-    4. Unclaimed sim with Pepper running
+    4. Unclaimed sim with Habanero running
     5. Unclaimed booted sim
     6. Boot an existing unbooted iPhone sim
     7. Error if at cap
@@ -190,7 +190,7 @@ def resolve_simulator(simulator: str | None = None) -> str:
     pepper_sessions.cleanup_stale()
 
     # Find an available simulator (reuse-first, capped)
-    # This covers: unclaimed Pepper sims, unclaimed booted sims, unbooted sims
+    # This covers: unclaimed Habanero sims, unclaimed booted sims, unbooted sims
     try:
         udid = pepper_sessions.find_available_simulator()
     except RuntimeError:
@@ -358,7 +358,7 @@ def _check_minos_compat(app_path: str, dylib_path: str) -> str | None:
         return None
 
     app_minos = _get_binary_minos(app_binary)
-    dylib_binary = os.path.join(dylib_path, "Pepper") if os.path.isdir(dylib_path) else dylib_path
+    dylib_binary = os.path.join(dylib_path, "Habanero") if os.path.isdir(dylib_path) else dylib_path
     dylib_minos = _get_binary_minos(dylib_binary)
 
     if not app_minos or not dylib_minos:
@@ -406,7 +406,7 @@ def _dylib_is_stale(dylib_path: str) -> bool:
 
 
 def _rebuild_dylib(ios_target_version: str | None = None) -> tuple[bool, str]:
-    """Rebuild the Pepper dylib. Returns (success, message)."""
+    """Rebuild the Habanero dylib. Returns (success, message)."""
     build_script = os.path.join(PEPPER_DIR, "tools", "build-dylib.sh")
     if not os.path.exists(build_script):
         return False, "build-dylib.sh not found — not a dev install"
@@ -434,7 +434,7 @@ async def deploy_app(
     skip_privacy: bool = False,
     launch_args: list[str] | None = None,
 ) -> str:
-    """Deploy (terminate + install + launch with Pepper). Returns status message + screen."""
+    """Deploy (terminate + install + launch with Habanero). Returns status message + screen."""
     cfg = get_config()
     bid = bundle_id
     dylib = dylib_path or cfg["dylib_path"]
@@ -460,10 +460,10 @@ async def deploy_app(
             from .dylib_fetch import ensure_dylib
             dylib = ensure_dylib()
         except Exception as e:
-            return f"Pepper dylib not found at {dylib} and auto-download failed: {e}\nRun `make build` in pepper dir or check your pepper-ios version."
+            return f"Habanero dylib not found at {dylib} and auto-download failed: {e}\nRun `make build` in habanero dir or check your habanero version."
 
     # Auto-rebuild dylib if source files are newer than the binary.
-    # This ensures agents in other worktrees pick up Pepper fixes without
+    # This ensures agents in other worktrees pick up Habanero fixes without
     # having to manually run `make build`.
     if _dylib_is_stale(dylib):
         logger.info("Dylib is stale — rebuilding before deploy")
@@ -482,7 +482,7 @@ async def deploy_app(
             label = session.get("label", "")
             label_str = f" ({label})" if label else ""
             return (
-                f"Simulator {simulator} is in use by another Pepper session "
+                f"Simulator {simulator} is in use by another Habanero session "
                 f"(PID {claiming_pid}{label_str}, claimed at {session.get('claimed_at', '?')}). "
                 f"Use a different simulator or wait for that session to finish.\n"
                 f"Tip: use `simulator action=list` to see all available simulators."
@@ -495,7 +495,7 @@ async def deploy_app(
     if not is_sim_booted(simulator):
         boot_simulator(simulator)
 
-    # Clean stale port file so we wait for the fresh Pepper instance
+    # Clean stale port file so we wait for the fresh Habanero instance
     _clean_stale_port(simulator)
 
     # Terminate existing app
@@ -575,11 +575,16 @@ async def deploy_app(
     except (ImportError, Exception):
         pass
 
+    # Emit the canonical HABANERO_* names plus legacy PEPPER_* for back-compat;
+    # the dylib reads HABANERO_* first and falls back to PEPPER_*.
     pepper_vars = {
+        "HABANERO_ADAPTER": adapter_type,
+        "HABANERO_SIM_UDID": simulator,
         "PEPPER_ADAPTER": adapter_type,
         "PEPPER_SIM_UDID": simulator,
     }
     if not skip_privacy:
+        pepper_vars["HABANERO_SKIP_PERMISSIONS"] = "1"
         pepper_vars["PEPPER_SKIP_PERMISSIONS"] = "1"
 
     for key, val in pepper_vars.items():
@@ -621,7 +626,7 @@ async def deploy_app(
 
     pid = result.stdout.strip().split(":")[-1].strip() if ":" in result.stdout else result.stdout.strip()
 
-    # Wait for Pepper to connect (10s timeout — cold launches need more time)
+    # Wait for Habanero to connect (10s timeout — cold launches need more time)
     port_file = os.path.join(PORT_DIR, f"{simulator}.port")
     for _attempt in range(20):
         await asyncio.sleep(0.5)
@@ -644,11 +649,11 @@ async def deploy_app(
                     global _session_bundle_id, _session_adapter_type
                     _session_bundle_id = bid
                     _session_adapter_type = adapter_type
-                    return f"Deployed to {simulator} (PID {pid}, port {port}). Pepper is connected.\n--- Screen ---\n{screen_summary}"
+                    return f"Deployed to {simulator} (PID {pid}, port {port}). Habanero is connected.\n--- Screen ---\n{screen_summary}"
             except (TimeoutError, OSError, ValueError):
                 pass
 
-    return f"App launched (PID {pid}) but Pepper didn't respond within 10s. Check dylib injection. Port file exists: {os.path.exists(port_file)}"
+    return f"App launched (PID {pid}) but Habanero didn't respond within 10s. Check dylib injection. Port file exists: {os.path.exists(port_file)}"
 
 
 def bundle_id_from_app(app_path: str) -> str | None:

@@ -6,7 +6,7 @@ import os
 
 import pytest
 
-import pepper_ios.pepper_common as pc
+import habanero.pepper_common as pc
 
 # ---------------------------------------------------------------------------
 # try_parse_json

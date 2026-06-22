@@ -1,4 +1,4 @@
-"""Dialog tool definition for Pepper MCP.
+"""Dialog tool definition for Habanero MCP.
 
 Tool definitions for: dialog.
 Includes system-dialog dismiss helper that prefers AX button taps and falls
@@ -189,7 +189,7 @@ async def _dismiss_system_dialog(simulator, resolve_and_send, resolve_simulator,
             "buttons": ax_buttons,
             "warning": (
                 "simctl privacy grant writes to TCC and SIGKILLs the target app. "
-                "The Pepper dylib died with it — redeploy via app_build before further Pepper calls."
+                "The Habanero dylib died with it — redeploy via app_build before further Habanero calls."
             ),
         }
 

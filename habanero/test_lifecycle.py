@@ -1,4 +1,4 @@
-"""pepper test lifecycle -- headless simulator management for test runs.
+"""habanero test lifecycle -- headless simulator management for test runs.
 
 Handles: find/create sim → boot → build dylib → build app → install →
 inject → wait for server → (tests run) → teardown.
@@ -120,12 +120,12 @@ def _boot_simulator(udid: str) -> None:
 # ---------------------------------------------------------------------------
 
 def build_dylib(project_dir: str) -> str:
-    """Build the Pepper dylib. Returns path to framework binary."""
-    _step("Building Pepper dylib")
+    """Build the Habanero dylib. Returns path to framework binary."""
+    _step("Building Habanero dylib")
     _run(["make", "-C", project_dir, "build"], capture=False, timeout=120)
-    dylib_path = os.path.join(project_dir, "build", "Pepper.framework", "Pepper")
+    dylib_path = os.path.join(project_dir, "build", "Habanero.framework", "Habanero")
     if not os.path.exists(dylib_path):
-        print("Error: Pepper.framework not found after build", file=sys.stderr)
+        print("Error: Habanero.framework not found after build", file=sys.stderr)
         sys.exit(2)
     _log(f"Built: {dylib_path}")
     return dylib_path
@@ -193,8 +193,8 @@ def build_and_install_app(project: str, scheme: str | None,
 
 def launch_with_pepper(sim: SimContext, bundle_id: str, dylib_path: str,
                        adapter: str = "generic") -> None:
-    """Launch app with Pepper dylib injected."""
-    _step("Launching with Pepper injection")
+    """Launch app with Habanero dylib injected."""
+    _step("Launching with Habanero injection")
 
     # Terminate any existing instance
     _run(["xcrun", "simctl", "terminate", sim.udid, bundle_id], check=False)
@@ -215,9 +215,14 @@ def launch_with_pepper(sim: SimContext, bundle_id: str, dylib_path: str,
         except FileNotFoundError:
             pass
 
-    # Launch with DYLD injection
+    # Launch with DYLD injection. Emit the canonical HABANERO_* names plus
+    # legacy PEPPER_* for back-compat; the dylib reads HABANERO_* first.
     env = os.environ.copy()
     env["SIMCTL_CHILD_DYLD_INSERT_LIBRARIES"] = dylib_path
+    env["SIMCTL_CHILD_HABANERO_PORT"] = str(sim.port)
+    env["SIMCTL_CHILD_HABANERO_SIM_UDID"] = sim.udid
+    env["SIMCTL_CHILD_HABANERO_ADAPTER"] = adapter
+    env["SIMCTL_CHILD_HABANERO_SKIP_PERMISSIONS"] = "1"
     env["SIMCTL_CHILD_PEPPER_PORT"] = str(sim.port)
     env["SIMCTL_CHILD_PEPPER_SIM_UDID"] = sim.udid
     env["SIMCTL_CHILD_PEPPER_ADAPTER"] = adapter
@@ -248,8 +253,8 @@ def launch_with_pepper(sim: SimContext, bundle_id: str, dylib_path: str,
 # ---------------------------------------------------------------------------
 
 def wait_for_server(host: str, port: int, timeout: int = 30) -> bool:
-    """Wait for Pepper WebSocket server to respond to ping."""
-    _step(f"Waiting for Pepper server (timeout: {timeout}s)")
+    """Wait for Habanero WebSocket server to respond to ping."""
+    _step(f"Waiting for Habanero server (timeout: {timeout}s)")
     deadline = time.monotonic() + timeout
     attempt = 0
 
@@ -310,8 +315,8 @@ def run_lifecycle(project: str, scheme: str | None = None,
 
     Returns (sim_context, bundle_id) ready for test execution.
     """
-    # Find pepper project root (where Makefile lives)
-    pepper_root = _find_pepper_root()
+    # Find habanero project root (where Makefile lives)
+    pepper_root = _find_habanero_root()
 
     # Simulator
     sim = find_or_create_simulator(simulator)
@@ -333,10 +338,11 @@ def run_lifecycle(project: str, scheme: str | None = None,
     return sim, bundle_id
 
 
-def _find_pepper_root() -> str:
-    """Find the Pepper project root (directory containing Makefile and dylib/)."""
-    # Check common locations
+def _find_habanero_root() -> str:
+    """Find the Habanero project root (directory containing Makefile and dylib/)."""
+    # Check common locations (new env name first, legacy fallback for back-compat)
     candidates = [
+        os.environ.get("HABANERO_ROOT", ""),
         os.environ.get("PEPPER_ROOT", ""),
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     ]
@@ -345,6 +351,6 @@ def _find_pepper_root() -> str:
            os.path.isdir(os.path.join(path, "dylib")):
             return path
 
-    print("Error: Cannot find Pepper project root. Set PEPPER_ROOT env var.",
+    print("Error: Cannot find Habanero project root. Set HABANERO_ROOT env var.",
           file=sys.stderr)
     sys.exit(2)

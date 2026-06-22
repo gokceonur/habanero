@@ -37,7 +37,7 @@ final class PepperAppConfig {
     var classLookupPrefixes: [String] = []
 
     /// OSLog subsystem identifier for logging.
-    var logSubsystem: String = "com.pepper.control"
+    var logSubsystem: String = "com.habanero.control"
 
     /// Known deep link paths for validation.
     /// If `deeplinks` is populated, paths are derived from those URLs automatically.

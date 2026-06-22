@@ -48,7 +48,7 @@ static void ensureInit(void) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         sHookRegistry = [NSMutableDictionary new];
-        sLog = os_log_create("com.pepper.control", "hook");
+        sLog = os_log_create("com.habanero.control", "hook");
         sDangerousClasses = [NSSet setWithArray:@[
             // Foundation roots — on every call path
             @"NSObject", @"NSProxy",

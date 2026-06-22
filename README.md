@@ -1,6 +1,6 @@
-# Pepper
+# Habanero
 
-Pepper gives AI agents eyes and hands inside iOS Simulator apps.
+Habanero gives AI agents eyes and hands inside iOS Simulator apps.
 
 It injects a shared library into any running simulator app — no source changes, no SDK, no build step. Your agent sees the screen as structured data, taps buttons, inspects live objects, intercepts network calls, reads the heap, and debugs layout issues. Dylib injection requires the simulator; device support uses a different mechanism.
 
@@ -15,16 +15,16 @@ Works with Claude Code · Cursor · Claude Desktop · any [MCP](https://modelcon
 Requires macOS 14+, Python 3.10+, and an iOS Simulator runtime.
 
 ```bash
-pip install pepper-ios
-pepper-ctl deploy            # inject into the frontmost simulator app
-pepper-ctl look              # see what's on screen
+pip install habanero
+habanero-ctl deploy            # inject into the frontmost simulator app
+habanero-ctl look              # see what's on screen
 ```
 
 Then ask your agent:
 
 > "Tap through the onboarding flow and make sure every screen looks right"
 
-That's it. The agent uses Pepper's MCP tools to see, tap, and inspect — no extra config needed.
+That's it. The agent uses Habanero's MCP tools to see, tap, and inspect — no extra config needed.
 
 <details>
 <summary>Other MCP clients (Cursor, Claude Desktop, etc.)</summary>
@@ -32,8 +32,8 @@ That's it. The agent uses Pepper's MCP tools to see, tap, and inspect — no ext
 ```json
 {
   "mcpServers": {
-    "pepper": {
-      "command": "pepper-mcp"
+    "habanero": {
+      "command": "habanero-mcp"
     }
   }
 }
@@ -45,17 +45,17 @@ That's it. The agent uses Pepper's MCP tools to see, tap, and inspect — no ext
 <summary>Homebrew</summary>
 
 ```bash
-brew install --HEAD skwallace36/pepper/pepper
+brew install --HEAD gokceonur/habanero/habanero
 ```
 
-Tap: [`skwallace36/homebrew-pepper`](https://github.com/skwallace36/homebrew-pepper)
+Tap: [`gokceonur/homebrew-habanero`](https://github.com/gokceonur/homebrew-habanero)
 
 </details>
 
 ## What It Does
 
 ```
-$ pepper-ctl look
+$ habanero-ctl look
 Screen: navigation_stack  (9 interactive, 4 text)
 
        seg  "Trending"                       → tap text:"Trending"
@@ -63,7 +63,7 @@ Screen: navigation_stack  (9 interactive, 4 text)
                                               → tap text:"Sheryl Weikal, Right wing tech bros: we ..."
        seg  "Settings"                       → tap text:"Settings"
 
-$ pepper-ctl tap --text "Settings"
+$ habanero-ctl tap --text "Settings"
 Action: Tapped Settings
 Screen: navigation_stack  Title: "Settings"  (15 interactive, 3 text)
 
@@ -96,9 +96,9 @@ View hierarchy, network interception, heap inspection, console capture, crash lo
 
 ## How It Works
 
-Pepper uses macOS's dynamic linker (`DYLD_INSERT_LIBRARIES`) to load a dylib into the simulator process at launch. The dylib starts a WebSocket server on a local port. `pepper-mcp` connects to that WebSocket and translates MCP tool calls into commands executed inside the app.
+Habanero uses macOS's dynamic linker (`DYLD_INSERT_LIBRARIES`) to load a dylib into the simulator process at launch. The dylib starts a WebSocket server on a local port. `habanero-mcp` connects to that WebSocket and translates MCP tool calls into commands executed inside the app.
 
-Because it runs in-process, Pepper has access to the full view hierarchy, the ObjC runtime, live object graphs, network delegates, and the HID event system. All touch input goes through native input events (IOHIDEvent) — the same path real fingers take. No private APIs, no entitlements — just `dyld`.
+Because it runs in-process, Habanero has access to the full view hierarchy, the ObjC runtime, live object graphs, network delegates, and the HID event system. All touch input goes through native input events (IOHIDEvent) — the same path real fingers take. No private APIs, no entitlements — just `dyld`.
 
 ## Development
 
