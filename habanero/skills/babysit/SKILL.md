@@ -15,7 +15,7 @@ leave the repo in a known-good state or with a clearly filed issue.
 ## What to watch
 
 1. **Build health.** `make build` compiles the dylib cleanly
-   (`build/Pepper.framework/Pepper`). A broken build blocks everything else —
+   (`build/Habanero.framework/Habanero`). A broken build blocks everything else —
    surface it first.
 2. **Test health.** `make py-test` (Python tool layer) and `make unit-test`
    (Swift Foundation-level) are green. `make lint-py` and `make typecheck` pass.
@@ -43,6 +43,6 @@ leave the repo in a known-good state or with a clearly filed issue.
 
 ## Boundaries
 
-- Do not touch `~/.pepper/` shared data.
+- Do not touch `~/.habanero/` (or legacy `~/.pepper/`) shared data.
 - Do not commit directly to `main`; custodial fixes go on a `fix/<slug>` branch.
 - Prefer filing a bug over a risky inline change — the bug log is the queue.

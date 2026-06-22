@@ -1,9 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
-# Build Pepper as a dynamic framework for iOS Simulator or device.
+# Build Habanero as a dynamic framework for iOS Simulator or device.
 #
-# Output: build/Pepper.framework/Pepper (Mach-O dylib)
+# Output: build/Habanero.framework/Habanero (Mach-O dylib)
 #
 # Usage:
 #   ./tools/build-dylib.sh              # build for current sim arch
@@ -19,7 +19,7 @@ CONTROL_DIR="$PROJECT_DIR/dylib"
 # git rev-parse --show-toplevel gives the worktree root (not the main repo).
 WORKTREE_ROOT=$(git -C "$PROJECT_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$PROJECT_DIR")
 BUILD_DIR="$WORKTREE_ROOT/build/dylib"
-FRAMEWORK_DIR="$WORKTREE_ROOT/build/Pepper.framework"
+FRAMEWORK_DIR="$WORKTREE_ROOT/build/Habanero.framework"
 
 # Colors
 GREEN='\033[0;32m'
@@ -47,7 +47,7 @@ done
 
 if [ -n "$CUSTOM_OUTPUT" ]; then
     BUILD_DIR="$CUSTOM_OUTPUT/dylib"
-    FRAMEWORK_DIR="$CUSTOM_OUTPUT/Pepper.framework"
+    FRAMEWORK_DIR="$CUSTOM_OUTPUT/Habanero.framework"
 fi
 
 # --- Build lock ---
@@ -107,8 +107,12 @@ if [ -f "$ENV_FILE" ]; then
     ADAPTER_TYPE=$(set -a && source "$ENV_FILE" 2>/dev/null && echo "${APP_ADAPTER_TYPE:-}")
 fi
 
-# --- Resolve adapter from ~/.pepper/adapters/ (overrides ADAPTER_PATH) ---
-ADAPTERS_DIR="$HOME/.pepper/adapters"
+# --- Resolve adapter from ~/.habanero/adapters/ (overrides ADAPTER_PATH) ---
+# Prefer the canonical ~/.habanero; fall back to legacy ~/.pepper if present.
+ADAPTERS_DIR="$HOME/.habanero/adapters"
+if [ ! -d "$ADAPTERS_DIR" ] && [ -d "$HOME/.pepper/adapters" ]; then
+    ADAPTERS_DIR="$HOME/.pepper/adapters"
+fi
 if [ -n "$ADAPTER_TYPE" ] && [ "$ADAPTER_TYPE" != "generic" ]; then
     CANDIDATE="$ADAPTERS_DIR/$ADAPTER_TYPE"
     if [ -d "$CANDIDATE" ] && [ -f "$CANDIDATE/config.json" ]; then
@@ -176,7 +180,7 @@ C_COUNT=$(( ${#C_FILES[@]} + ${#OBJC_FILES[@]} ))
 info "Compiling $SWIFT_COUNT Swift + $C_COUNT C/ObjC files..."
 
 # --- Create output dirs ---
-mkdir -p "$BUILD_DIR" "$FRAMEWORK_DIR/Modules/Pepper.swiftmodule"
+mkdir -p "$BUILD_DIR" "$FRAMEWORK_DIR/Modules/Habanero.swiftmodule"
 
 # --- Step 1: Compile C/ObjC sources to object files (parallel) ---
 C_OBJECTS=()
@@ -218,7 +222,7 @@ for m_file in "${OBJC_FILES[@]}"; do
     h_file="${m_file%.m}.h"
     if [ -f "$h_file" ]; then
         # Use a combined bridging header that imports all ObjC headers
-        BRIDGING_HEADER="$BUILD_DIR/Pepper-Bridging-Header.h"
+        BRIDGING_HEADER="$BUILD_DIR/Habanero-Bridging-Header.h"
         break
     fi
 done
@@ -243,9 +247,9 @@ xcrun -sdk "$SDK_NAME" swiftc \
     -module-cache-path "$MODULE_CACHE" \
     -emit-library \
     -emit-module \
-    -emit-module-path "$FRAMEWORK_DIR/Modules/Pepper.swiftmodule/${ARCH}.swiftmodule" \
-    -module-name Pepper \
-    -o "$FRAMEWORK_DIR/Pepper" \
+    -emit-module-path "$FRAMEWORK_DIR/Modules/Habanero.swiftmodule/${ARCH}.swiftmodule" \
+    -module-name Habanero \
+    -o "$FRAMEWORK_DIR/Habanero" \
     -Osize \
     -whole-module-optimization \
     -warnings-as-errors \
@@ -264,7 +268,7 @@ xcrun -sdk "$SDK_NAME" swiftc \
     -framework Contacts \
     -framework CoreLocation \
     -framework WebKit \
-    -Xlinker -install_name -Xlinker @rpath/Pepper.framework/Pepper \
+    -Xlinker -install_name -Xlinker @rpath/Habanero.framework/Habanero \
     ${BRIDGING_HEADER:+-import-objc-header "$BRIDGING_HEADER"} \
     "${SWIFT_FILES[@]}" \
     "${C_OBJECTS[@]}"
@@ -276,11 +280,11 @@ cat > "$FRAMEWORK_DIR/Info.plist" <<PLIST
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>com.pepper.control</string>
+    <string>com.habanero.control</string>
     <key>CFBundleName</key>
-    <string>Pepper</string>
+    <string>Habanero</string>
     <key>CFBundleExecutable</key>
-    <string>Pepper</string>
+    <string>Habanero</string>
     <key>CFBundlePackageType</key>
     <string>FMWK</string>
     <key>CFBundleVersion</key>
@@ -300,7 +304,7 @@ PLIST
 codesign --force --sign - --deep "$FRAMEWORK_DIR"
 
 # --- Report ---
-DYLIB_SIZE=$(stat -f%z "$FRAMEWORK_DIR/Pepper" 2>/dev/null || stat --printf='%s' "$FRAMEWORK_DIR/Pepper" 2>/dev/null)
+DYLIB_SIZE=$(stat -f%z "$FRAMEWORK_DIR/Habanero" 2>/dev/null || stat --printf='%s' "$FRAMEWORK_DIR/Habanero" 2>/dev/null)
 DYLIB_SIZE_KB=$((DYLIB_SIZE / 1024))
-success "Built Pepper.framework (${DYLIB_SIZE_KB}KB)"
-success "  $FRAMEWORK_DIR/Pepper"
+success "Built Habanero.framework (${DYLIB_SIZE_KB}KB)"
+success "  $FRAMEWORK_DIR/Habanero"

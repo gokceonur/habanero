@@ -17,14 +17,14 @@ dependencies = [
 ]
 
 [project.scripts]
-habanero-mcp = "pepper_ios.mcp_server:main"
-habanero-ctl = "pepper_ios.ctl:main"
-habanero-test = "pepper_ios.test_runner:main"
+habanero-mcp = "habanero.mcp_server:main"
+habanero-ctl = "habanero.ctl:main"
+habanero-test = "habanero.test_runner:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["pepper_ios"]
+packages = ["habanero"]
 
-# Skill-prompt sources live in the tracked tree at `pepper_ios/skills/<name>/
+# Skill-prompt sources live in the tracked tree at `habanero/skills/<name>/
 # SKILL.md`, so they are bundled automatically as package data by the `packages`
 # entry above and resolve at runtime via `importlib.resources` (see
 # `mcp_prompts._read_skill`). No `force-include` is needed — and adding one for

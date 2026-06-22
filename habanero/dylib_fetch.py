@@ -1,4 +1,4 @@
-"""Download and cache prebuilt Pepper.framework from GitHub Releases."""
+"""Download and cache prebuilt Habanero.framework from GitHub Releases."""
 
 from __future__ import annotations
 
@@ -13,9 +13,25 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
-GITHUB_REPO = "skwallace36/Pepper"
-CACHE_DIR = Path.home() / ".pepper" / "frameworks"
-FRAMEWORK_NAME = "Pepper.framework"
+GITHUB_REPO = "gokceonur/habanero"
+
+
+def _frameworks_cache_dir() -> Path:
+    """Framework download cache dir.
+
+    Prefer the canonical ``~/.habanero/frameworks``; fall back to the legacy
+    ``~/.pepper/frameworks`` only when it already exists (read-both — this never
+    moves or deletes the populated legacy dir).
+    """
+    legacy = Path.home() / ".pepper" / "frameworks"
+    canonical = Path.home() / ".habanero" / "frameworks"
+    if legacy.exists() and not canonical.exists():
+        return legacy
+    return canonical
+
+
+CACHE_DIR = _frameworks_cache_dir()
+FRAMEWORK_NAME = "Habanero.framework"
 
 
 def _resolve_version() -> str:
@@ -45,7 +61,7 @@ def _download(url: str, dest: Path) -> None:
                 downloaded += len(chunk)
                 if is_tty and total:
                     pct = downloaded * 100 // total
-                    print(f"\r  downloading Pepper.framework ... {pct}%", end="", file=sys.stderr)
+                    print(f"\r  downloading Habanero.framework ... {pct}%", end="", file=sys.stderr)
         if is_tty and total:
             print(file=sys.stderr)
         shutil.move(tmp_path, dest)
@@ -66,13 +82,14 @@ def _codesign(framework_path: Path) -> None:
 
 
 def ensure_dylib(version: str | None = None) -> str:
-    """Return path to the Pepper dylib binary, downloading if needed.
+    """Return path to the Habanero dylib binary, downloading if needed.
 
-    Caches to ~/.pepper/frameworks/<version>/Pepper.framework/Pepper.
+    Caches to ~/.habanero/frameworks/<version>/Habanero.framework/Habanero
+    (or the legacy ~/.pepper location when that already exists).
     """
     ver = version or _resolve_version()
     framework_dir = CACHE_DIR / ver / FRAMEWORK_NAME
-    binary = framework_dir / "Pepper"
+    binary = framework_dir / "Habanero"
 
     if binary.is_file():
         return str(binary)
@@ -80,14 +97,14 @@ def ensure_dylib(version: str | None = None) -> str:
     url = _asset_url(ver)
     zip_path = CACHE_DIR / ver / f"{FRAMEWORK_NAME}.zip"
 
-    print(f"Pepper dylib not found locally — downloading v{ver} from GitHub Releases...", file=sys.stderr)
+    print(f"Habanero dylib not found locally — downloading v{ver} from GitHub Releases...", file=sys.stderr)
     try:
         _download(url, zip_path)
     except HTTPError as e:
         if e.code == 404:
             raise RuntimeError(
                 f"No prebuilt dylib for v{ver} at {url}\n"
-                f"Either upgrade pepper-ios or build from source: make build"
+                f"Either upgrade habanero or build from source: make build"
             ) from e
         raise RuntimeError(f"Download failed ({e.code}): {url}") from e
     except URLError as e:

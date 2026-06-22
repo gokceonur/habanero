@@ -1,7 +1,7 @@
-# Pepper — MCP server for iOS Simulator runtime control
-# https://smithery.ai/server/@skwallace36/pepper
+# Habanero — MCP server for iOS Simulator runtime control
+# https://smithery.ai/server/@gokceonur/habanero
 #
-# Pepper is macOS-only and requires a running iOS Simulator.
+# Habanero is macOS-only and requires a running iOS Simulator.
 # Run `make setup && make test-deploy` before adding to your MCP client.
 
 startCommand:
@@ -12,7 +12,7 @@ startCommand:
       pythonPath:
         type: string
         description: >
-          Path to the Python 3.11+ interpreter inside the Pepper venv.
+          Path to the Python 3.11+ interpreter inside the Habanero venv.
           Defaults to .venv/bin/python3 (created by `make setup`).
         default: ""
     required: []

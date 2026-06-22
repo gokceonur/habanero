@@ -1,14 +1,14 @@
 # dylib/
 
-The Swift source for Pepper's injected dylib. Everything here compiles into `build/Pepper.framework/Pepper`.
+The Swift source for Habanero's injected dylib. Everything here compiles into `build/Habanero.framework/Habanero`.
 
 ## How Injection Works
 
-Pepper uses `DYLD_INSERT_LIBRARIES`, a macOS/iOS mechanism that tells the dynamic linker to load an extra shared library into a process before `main()` runs. The simulator launcher sets this environment variable pointing at `Pepper.framework/Pepper`, so the dylib loads alongside the target app — no source patches, no recompilation, no Xcode scheme changes needed.
+Habanero uses `DYLD_INSERT_LIBRARIES`, a macOS/iOS mechanism that tells the dynamic linker to load an extra shared library into a process before `main()` runs. The simulator launcher sets this environment variable pointing at `Habanero.framework/Habanero`, so the dylib loads alongside the target app — no source patches, no recompilation, no Xcode scheme changes needed.
 
 ### Bootstrap sequence
 
-1. **dyld loads the framework** — the dynamic linker maps Pepper into the app's address space.
+1. **dyld loads the framework** — the dynamic linker maps Habanero into the app's address space.
 2. **C constructor fires** — `bootstrap.c` defines a `__attribute__((constructor))` function. The linker calls this automatically at load time, before `main()`.
 3. **Swift bootstrap** — the constructor calls `PepperBootstrap()` (in `PepperLoader.swift`), which:
    - Registers any app adapter (custom handlers, deep link routes, icon mappings).
@@ -25,7 +25,7 @@ Each simulator gets a deterministic port: `8770 + md5(UDID)[:4] % 100`. This avo
 
 - **Zero friction** — works with any iOS simulator app. No entitlements, no code signing changes, no build system integration required.
 - **Full runtime access** — the dylib runs _inside_ the app process with the same permissions. It can read the view hierarchy, synthesize touch events, inspect the heap, intercept network calls, and call any API the app itself could call.
-- **Invisible to the app** — the target app has no idea Pepper is there. No test target dependencies, no conditional compilation, no debug menus to ship.
+- **Invisible to the app** — the target app has no idea Habanero is there. No test target dependencies, no conditional compilation, no debug menus to ship.
 
 ## Architecture
 

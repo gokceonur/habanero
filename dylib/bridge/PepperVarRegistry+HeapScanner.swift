@@ -31,10 +31,11 @@ extension PepperVarRegistry {
     /// Scan the ObjC heap for @Observable instances. Uses class introspection first,
     /// then the C heap scanner to find live instances. Independent of SwiftUI view tree.
     func discoverFromHeap() {
-        // Safe mode: skip heap scanning entirely. Set PEPPER_SAFE_MODE=1 in CI
-        // or other environments where the heap scan may crash the process.
-        if ProcessInfo.processInfo.environment["PEPPER_SAFE_MODE"] != nil {
-            pepperLog.info("Vars: heap scan skipped (PEPPER_SAFE_MODE)", category: .bridge)
+        // Safe mode: skip heap scanning entirely. Set HABANERO_SAFE_MODE=1
+        // (legacy PEPPER_SAFE_MODE) in CI or other environments where the heap
+        // scan may crash the process.
+        if habaneroEnv("SAFE_MODE") != nil {
+            pepperLog.info("Vars: heap scan skipped (HABANERO_SAFE_MODE)", category: .bridge)
             return
         }
 

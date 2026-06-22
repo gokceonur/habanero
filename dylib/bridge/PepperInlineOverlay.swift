@@ -113,7 +113,7 @@ final class PepperInlineOverlay {
     private func notifyScrollEnd() {
         guard !activeLayers.isEmpty else { return }
         // Notify the local agent observation endpoint (if running) to refresh highlights.
-        let port = ProcessInfo.processInfo.environment["PEPPER_OBSERVE_PORT"] ?? "8767"
+        let port = habaneroEnv("OBSERVE_PORT") ?? "8767"
         guard let url = URL(string: "http://localhost:\(port)/api/agent/tool/observe") else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"

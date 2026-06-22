@@ -1,6 +1,6 @@
 """Regression tests for skill-prompt bundling (BUG-001).
 
-Skill sources must live in the tracked package tree (`pepper_ios/skills/<name>/
+Skill sources must live in the tracked package tree (`habanero/skills/<name>/
 SKILL.md`) so they ship inside the wheel and resolve at runtime via
 `importlib.resources`. The previous state force-included the gitignored
 `.claude/skills` path, which broke `pip install -e .` on a fresh clone and left
@@ -16,7 +16,7 @@ from importlib import resources
 
 import pytest
 
-import pepper_ios.mcp_prompts as mp
+import habanero.mcp_prompts as mp
 
 # Skill directory names declared in mcp_prompts._SKILLS.
 SKILL_DIRS = [skill_dir for (_, _, skill_dir, _) in mp._SKILLS]
@@ -24,14 +24,14 @@ SKILL_DIRS = [skill_dir for (_, _, skill_dir, _) in mp._SKILLS]
 
 @pytest.mark.parametrize("skill_dir", SKILL_DIRS)
 def test_skill_md_bundled_in_package(skill_dir: str) -> None:
-    """Each declared skill has a SKILL.md under the packaged `pepper_ios/skills/`.
+    """Each declared skill has a SKILL.md under the packaged `habanero/skills/`.
 
     This is the path a built wheel exposes; resolving it via importlib.resources
     proves the file is part of the package, not just present in a dev checkout.
     """
-    packaged = resources.files("pepper_ios") / "skills" / skill_dir / "SKILL.md"
+    packaged = resources.files("habanero") / "skills" / skill_dir / "SKILL.md"
     assert packaged.is_file(), (
-        f"{skill_dir}/SKILL.md is not bundled under pepper_ios/skills/ — "
+        f"{skill_dir}/SKILL.md is not bundled under habanero/skills/ — "
         "skill-prompts will be unavailable in a clean install"
     )
 

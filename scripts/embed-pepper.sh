@@ -1,10 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
-# Embed Pepper.xcframework into an Xcode project for on-device use.
+# Embed Habanero.xcframework into an Xcode project for on-device use.
 #
 # This script:
-#   1. Builds Pepper.xcframework if it doesn't exist
+#   1. Builds Habanero.xcframework if it doesn't exist
 #   2. Copies it into the Xcode project directory
 #   3. Prints Xcode configuration instructions
 #
@@ -15,7 +15,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 WORKTREE_ROOT=$(git -C "$PROJECT_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$PROJECT_DIR")
-XCF_PATH="$WORKTREE_ROOT/build/Pepper.xcframework"
+XCF_PATH="$WORKTREE_ROOT/build/Habanero.xcframework"
 
 # Colors
 GREEN='\033[0;32m'
@@ -32,7 +32,7 @@ usage() {
     echo "Usage: $0 <path/to/YourApp.xcodeproj> [--rebuild]"
     echo ""
     echo "Options:"
-    echo "  --rebuild    Force rebuild of Pepper.xcframework"
+    echo "  --rebuild    Force rebuild of Habanero.xcframework"
     exit 1
 }
 
@@ -60,21 +60,21 @@ fi
 
 # --- Build xcframework if needed ---
 if [ -n "$REBUILD" ] || [ ! -d "$XCF_PATH" ]; then
-    info "Building Pepper.xcframework..."
+    info "Building Habanero.xcframework..."
     bash "$PROJECT_DIR/tools/build-xcframework.sh" ${REBUILD:+--clean}
 fi
 
 # --- Copy into project directory ---
 DEST_DIR="$(dirname "$XCODEPROJ")"
-DEST_XCF="$DEST_DIR/Pepper.xcframework"
+DEST_XCF="$DEST_DIR/Habanero.xcframework"
 
 if [ -d "$DEST_XCF" ]; then
-    info "Removing existing Pepper.xcframework..."
+    info "Removing existing Habanero.xcframework..."
     rm -rf "$DEST_XCF"
 fi
 
 cp -R "$XCF_PATH" "$DEST_XCF"
-success "Copied Pepper.xcframework → $DEST_XCF"
+success "Copied Habanero.xcframework → $DEST_XCF"
 
 # --- Print Xcode setup instructions ---
 echo ""
@@ -84,26 +84,26 @@ echo "  1. Open $(basename "$XCODEPROJ") in Xcode"
 echo ""
 echo "  2. Add the framework:"
 echo "     • Select your app target → General → Frameworks, Libraries, and Embedded Content"
-echo "     • Click '+' → Add Other → Add Files → select Pepper.xcframework"
+echo "     • Click '+' → Add Other → Add Files → select Habanero.xcframework"
 echo "     • Set embed mode to \"Embed & Sign\""
 echo ""
-echo "  3. No code changes needed — Pepper starts automatically via"
+echo "  3. No code changes needed — Habanero starts automatically via"
 echo "     __attribute__((constructor)) when the framework loads."
 echo "     Default WebSocket port: 8765"
 echo ""
 echo "  4. To set a custom port, add to your scheme's environment variables:"
 echo "     • Product → Scheme → Edit Scheme → Run → Arguments → Environment Variables"
-echo "     • Add: PEPPER_PORT = <your port>"
+echo "     • Add: HABANERO_PORT = <your port>  (legacy PEPPER_PORT also works)"
 echo ""
 echo "  5. Connect from your Mac (device must be on same WiFi network):"
 echo "     • Find the device IP: Settings → Wi-Fi → tap (i) on your network"
-echo "     • Connect: pepper-ctl --host <device-ip> --port 8765 ping"
+echo "     • Connect: habanero-ctl --host <device-ip> --port 8765 ping"
 echo ""
 echo -e "${BOLD}=== Local Network (required for iOS 14+) ===${NC}"
 echo ""
 echo "  If your app doesn't already have Local Network permission:"
 echo "  • Add to Info.plist:"
-echo "    - NSLocalNetworkUsageDescription: \"Pepper debug server\""
-echo "    - NSBonjourServices: [\"_pepper._tcp\"]"
+echo "    - NSLocalNetworkUsageDescription: \"Habanero debug server\""
+echo "    - NSBonjourServices: [\"_habanero._tcp\"]"
 echo ""
-success "Done. Build and run your app to start Pepper."
+success "Done. Build and run your app to start Habanero."

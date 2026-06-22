@@ -1,9 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
-# Build Pepper as an XCFramework containing both device and simulator slices.
+# Build Habanero as an XCFramework containing both device and simulator slices.
 #
-# Output: build/Pepper.xcframework/
+# Output: build/Habanero.xcframework/
 #
 # Usage:
 #   ./tools/build-xcframework.sh              # build xcframework
@@ -16,7 +16,7 @@ CONTROL_DIR="$PROJECT_DIR/dylib"
 
 WORKTREE_ROOT=$(git -C "$PROJECT_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$PROJECT_DIR")
 BUILD_DIR="$WORKTREE_ROOT/build/xcframework"
-XCFRAMEWORK_DIR="$WORKTREE_ROOT/build/Pepper.xcframework"
+XCFRAMEWORK_DIR="$WORKTREE_ROOT/build/Habanero.xcframework"
 
 # Colors
 GREEN='\033[0;32m'
@@ -116,7 +116,7 @@ BRIDGING_HEADER=""
 for m_file in "${OBJC_FILES[@]}"; do
     h_file="${m_file%.m}.h"
     if [ -f "$h_file" ]; then
-        BRIDGING_HEADER="$BUILD_DIR/Pepper-Bridging-Header.h"
+        BRIDGING_HEADER="$BUILD_DIR/Habanero-Bridging-Header.h"
         break
     fi
 done
@@ -149,7 +149,7 @@ build_slice() {
     info "  SDK: $sdk_path"
     info "  Target: $target"
 
-    mkdir -p "$obj_dir" "$slice_dir/Modules/Pepper.swiftmodule"
+    mkdir -p "$obj_dir" "$slice_dir/Modules/Habanero.swiftmodule"
 
     # --- Compile C/ObjC ---
     local c_objects=()
@@ -192,9 +192,9 @@ build_slice() {
         -sdk "$sdk_path" \
         -emit-library \
         -emit-module \
-        -emit-module-path "$slice_dir/Modules/Pepper.swiftmodule/${arch}.swiftmodule" \
-        -module-name Pepper \
-        -o "$slice_dir/Pepper" \
+        -emit-module-path "$slice_dir/Modules/Habanero.swiftmodule/${arch}.swiftmodule" \
+        -module-name Habanero \
+        -o "$slice_dir/Habanero" \
         -Osize \
         -whole-module-optimization \
         -DPEPPER_CONTROL -DPEPPER \
@@ -210,7 +210,7 @@ build_slice() {
         -framework AppTrackingTransparency \
         -framework Contacts \
         -framework CoreLocation \
-        -Xlinker -install_name -Xlinker @rpath/Pepper.framework/Pepper \
+        -Xlinker -install_name -Xlinker @rpath/Habanero.framework/Habanero \
         ${BRIDGING_HEADER:+-import-objc-header "$BRIDGING_HEADER"} \
         "${SWIFT_FILES[@]}" \
         "${c_objects[@]}"
@@ -222,11 +222,11 @@ build_slice() {
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>com.pepper.control</string>
+    <string>com.habanero.control</string>
     <key>CFBundleName</key>
-    <string>Pepper</string>
+    <string>Habanero</string>
     <key>CFBundleExecutable</key>
-    <string>Pepper</string>
+    <string>Habanero</string>
     <key>CFBundlePackageType</key>
     <string>FMWK</string>
     <key>CFBundleVersion</key>
@@ -240,7 +240,7 @@ build_slice() {
 PLIST
 
     local size
-    size=$(stat -f%z "$slice_dir/Pepper" 2>/dev/null || stat --printf='%s' "$slice_dir/Pepper" 2>/dev/null)
+    size=$(stat -f%z "$slice_dir/Habanero" 2>/dev/null || stat --printf='%s' "$slice_dir/Habanero" 2>/dev/null)
     success "  $sdk slice: $((size / 1024))KB"
 }
 
@@ -253,7 +253,7 @@ info "Compiling $SWIFT_COUNT Swift + $C_COUNT C/ObjC files..."
 # Simulator slice — always arm64 on Apple Silicon, x86_64 on Intel
 SIM_ARCH=$(uname -m)
 SIM_TARGET="${SIM_ARCH}-apple-ios${IOS_TARGET_VERSION}-simulator"
-SIM_FRAMEWORK="$BUILD_DIR/sim/Pepper.framework"
+SIM_FRAMEWORK="$BUILD_DIR/sim/Habanero.framework"
 build_slice iphonesimulator "$SIM_TARGET" "$SIM_ARCH" "$SIM_FRAMEWORK"
 
 FRAMEWORK_ARGS=(-framework "$SIM_FRAMEWORK")
@@ -261,7 +261,7 @@ FRAMEWORK_ARGS=(-framework "$SIM_FRAMEWORK")
 if [ -z "$SIM_ONLY" ]; then
     # Device slice — always arm64
     DEVICE_TARGET="arm64-apple-ios${IOS_TARGET_VERSION}"
-    DEVICE_FRAMEWORK="$BUILD_DIR/device/Pepper.framework"
+    DEVICE_FRAMEWORK="$BUILD_DIR/device/Habanero.framework"
     build_slice iphoneos "$DEVICE_TARGET" arm64 "$DEVICE_FRAMEWORK"
     FRAMEWORK_ARGS+=(-framework "$DEVICE_FRAMEWORK")
 fi
@@ -277,5 +277,5 @@ xcodebuild -create-xcframework \
     "${FRAMEWORK_ARGS[@]}" \
     -output "$XCFRAMEWORK_DIR"
 
-success "Built Pepper.xcframework"
+success "Built Habanero.xcframework"
 success "  $XCFRAMEWORK_DIR"

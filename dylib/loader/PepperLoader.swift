@@ -7,12 +7,21 @@ import UIKit
 /// In static-library mode (SPM link), this file is harmless — AppDelegate
 /// calls PepperPlane.shared.start() directly and the notification observer
 /// here just no-ops (start() is idempotent).
+/// Read a Habanero runtime env var, preferring the canonical `HABANERO_<suffix>`
+/// name and falling back to the legacy `PEPPER_<suffix>` for back-compat with
+/// external launch snippets that still set `SIMCTL_CHILD_PEPPER_*`.
+func habaneroEnv(_ suffix: String) -> String? {
+    let env = ProcessInfo.processInfo.environment
+    return env["HABANERO_\(suffix)"] ?? env["PEPPER_\(suffix)"]
+}
+
 @_cdecl("PepperBootstrap")
 public func pepperBootstrap() {
-    // Register the app adapter bootstrap based on the PEPPER_ADAPTER env var.
-    // Known adapters register here; "generic" or unset means no app-specific config.
-    // The dashboard sets this env var at launch via SIMCTL_CHILD_PEPPER_ADAPTER.
-    let adapterType = ProcessInfo.processInfo.environment["PEPPER_ADAPTER"] ?? "generic"
+    // Register the app adapter bootstrap based on the HABANERO_ADAPTER env var
+    // (legacy PEPPER_ADAPTER still honored). Known adapters register here;
+    // "generic" or unset means no app-specific config. The dashboard sets this
+    // env var at launch via SIMCTL_CHILD_HABANERO_ADAPTER (or legacy _PEPPER_).
+    let adapterType = habaneroEnv("ADAPTER") ?? "generic"
     PepperAppConfig.shared.requestedAdapterType = adapterType
 
     // Register the app adapter. Each adapter sets preMainHook (early setup
@@ -65,30 +74,27 @@ public func pepperBootstrap() {
         // requestAuthorization need individual swizzling.
         // Class enumeration uses a C helper to avoid swift_dynamicCast crash
         // on iOS 26.3 (BUG-766).
-        if ProcessInfo.processInfo.environment["PEPPER_SKIP_PERMISSIONS"] != "1" {
+        if habaneroEnv("SKIP_PERMISSIONS") != "1" {
             PepperDialogInterceptor.reinforceNotificationSwizzle()
         }
 
-        // Resolve port: PEPPER_PORT env var > PepperPort Info.plist key > auto-detect from UDID > default 8765
+        // Resolve port: HABANERO_PORT (legacy PEPPER_PORT) env var > PepperPort
+        // Info.plist key > auto-detect from UDID > default 8765
         let port: UInt16
         let udid: String?
 
-        if let envPort = ProcessInfo.processInfo.environment["PEPPER_PORT"],
+        if let envPort = habaneroEnv("PORT"),
             let parsed = UInt16(envPort)
         {
             port = parsed
-            udid =
-                ProcessInfo.processInfo.environment["PEPPER_SIM_UDID"]
-                ?? PepperSimDetect.detectUDID()
+            udid = habaneroEnv("SIM_UDID") ?? PepperSimDetect.detectUDID()
         } else if let plistPort = Bundle.main.infoDictionary?["PepperPort"],
             let parsed = (plistPort as? Int).map(UInt16.init)
                 ?? (plistPort as? String).flatMap(UInt16.init)
         {
             // Info.plist key — useful when env vars aren't available (e.g. app-clip, on-device builds).
             port = parsed
-            udid =
-                ProcessInfo.processInfo.environment["PEPPER_SIM_UDID"]
-                ?? PepperSimDetect.detectUDID()
+            udid = habaneroEnv("SIM_UDID") ?? PepperSimDetect.detectUDID()
         } else if let detected = PepperSimDetect.detectUDID() {
             // Auto-detect: compute the same deterministic port as the Makefile
             // (8770 + md5(udid)[:4] % 100) so pepper-ctl discovers us on the same port.

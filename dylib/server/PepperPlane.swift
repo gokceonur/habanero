@@ -57,7 +57,7 @@ public final class PepperPlane {
     /// - Parameters:
     ///   - port: WebSocket listen port (default 8765)
     ///   - simulatorUDID: Simulator UDID for port-file auto-discovery.
-    ///     Falls back to PEPPER_SIM_UDID env var if nil.
+    ///     Falls back to HABANERO_SIM_UDID (legacy PEPPER_SIM_UDID) env var if nil.
     public func start(port: UInt16 = 8765, simulatorUDID: String? = nil) {
         #if PEPPER_CONTROL
             lock.lock()
@@ -69,9 +69,7 @@ public final class PepperPlane {
             }
 
             // Resolve simulator UDID: explicit param > env var > nil (no port file)
-            self.resolvedUDID =
-                simulatorUDID
-                ?? ProcessInfo.processInfo.environment["PEPPER_SIM_UDID"]
+            self.resolvedUDID = simulatorUDID ?? habaneroEnv("SIM_UDID")
 
             // Wire app-specific configuration before anything else
             PepperAppConfig.shared.appBootstrap?()

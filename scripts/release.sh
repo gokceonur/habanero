@@ -4,7 +4,7 @@
 #
 # Steps:
 #   1. Validate: on main, clean tree, not already tagged
-#   2. Bump version in pyproject.toml + pepper_ios/__init__.py
+#   2. Bump version in pyproject.toml + habanero/__init__.py
 #   3. Create a PR for the version bump, merge it
 #   4. Tag main and push the tag (triggers mirror → release → PyPI via CI)
 #
@@ -72,10 +72,10 @@ RELEASE_BRANCH="release/$TAG"
 git checkout -b "$RELEASE_BRANCH"
 
 sed -i '' "s/version = \"$CURRENT\"/version = \"$NEW\"/" pyproject.toml
-sed -i '' "s/__version__ = \"$CURRENT\"/__version__ = \"$NEW\"/" pepper_ios/__init__.py
+sed -i '' "s/__version__ = \"$CURRENT\"/__version__ = \"$NEW\"/" habanero/__init__.py
 
 # Verify
-PKG_VER=$(python3 -c "from pepper_ios import __version__; print(__version__)")
+PKG_VER=$(python3 -c "from habanero import __version__; print(__version__)")
 if [ "$PKG_VER" != "$NEW" ]; then
     echo "ERROR: version mismatch after bump — pyproject says $NEW but __init__ says $PKG_VER"
     git checkout main
@@ -83,7 +83,7 @@ if [ "$PKG_VER" != "$NEW" ]; then
     exit 1
 fi
 
-git add pyproject.toml pepper_ios/__init__.py
+git add pyproject.toml habanero/__init__.py
 git commit -m "Release $TAG"
 git push -u origin "$RELEASE_BRANCH"
 gh pr create --title "Release $TAG" --body "Version bump: $CURRENT → $NEW"

@@ -1,34 +1,34 @@
 """
-pepper-ctl -- command-line interface for the pepper plane.
+habanero-ctl -- command-line interface for the habanero plane.
 
 Usage:
-  pepper-ctl ping
-  pepper-ctl tree [--depth N]
-  pepper-ctl snapshot                         # interactive elements (introspect)
-  pepper-ctl tap --text "Label"
-  pepper-ctl tap --id save_button
-  pepper-ctl tap --class UIButton --index 0
-  pepper-ctl tap --point 100,750
-  pepper-ctl input --text "Email" --value "user@example.com"
-  pepper-ctl navigate --deeplink "home"
-  pepper-ctl navigate --screen settings
-  pepper-ctl look                             # compact screen summary
-  pepper-ctl read --id element_id
-  pepper-ctl scroll --direction down --amount 300
-  pepper-ctl batch --file commands.json
-  pepper-ctl wait-for-server --wait-timeout 60
-  pepper-ctl test-report --file tests.json --format junit --output results.xml
-  pepper-ctl ci-run                              # wait + smoke test + exit code
-  pepper-ctl ci-run --file custom.json -o results.xml
-  pepper-ctl test-flow -f tests.yaml --verbose      # deterministic UI test flows
-  pepper-ctl help
-  pepper-ctl raw '{"cmd":"ping"}'
+  habanero-ctl ping
+  habanero-ctl tree [--depth N]
+  habanero-ctl snapshot                         # interactive elements (introspect)
+  habanero-ctl tap --text "Label"
+  habanero-ctl tap --id save_button
+  habanero-ctl tap --class UIButton --index 0
+  habanero-ctl tap --point 100,750
+  habanero-ctl input --text "Email" --value "user@example.com"
+  habanero-ctl navigate --deeplink "home"
+  habanero-ctl navigate --screen settings
+  habanero-ctl look                             # compact screen summary
+  habanero-ctl read --id element_id
+  habanero-ctl scroll --direction down --amount 300
+  habanero-ctl batch --file commands.json
+  habanero-ctl wait-for-server --wait-timeout 60
+  habanero-ctl test-report --file tests.json --format junit --output results.xml
+  habanero-ctl ci-run                              # wait + smoke test + exit code
+  habanero-ctl ci-run --file custom.json -o results.xml
+  habanero-ctl test-flow -f tests.yaml --verbose      # deterministic UI test flows
+  habanero-ctl help
+  habanero-ctl raw '{"cmd":"ping"}'
 
 Device management:
-  pepper-ctl register-device --udid UDID --host IP --port PORT
-  pepper-ctl unregister-device --udid UDID
-  pepper-ctl list-instances                   # show all sims + devices
-  pepper-ctl --device UDID ping               # target a specific device
+  habanero-ctl register-device --udid UDID --host IP --port PORT
+  habanero-ctl unregister-device --udid UDID
+  habanero-ctl list-instances                   # show all sims + devices
+  habanero-ctl --device UDID ping               # target a specific device
 """
 
 import argparse
@@ -72,7 +72,7 @@ DEFAULT_PORT = None  # Auto-discover from port files
 
 
 def discover_port(simulator=None):
-    """Auto-discover Pepper port, falling back to 8765 for CLI use."""
+    """Auto-discover Habanero port, falling back to 8765 for CLI use."""
     try:
         return _discover_port(simulator=simulator, fallback=8765)
     except RuntimeError as e:
@@ -200,29 +200,29 @@ def output_response(response, raw_json=False):
 
 def build_parser():
     parser = argparse.ArgumentParser(
-        prog="pepper-ctl",
-        description="Command-line interface for the pepper plane.",
+        prog="habanero-ctl",
+        description="Command-line interface for the habanero plane.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""examples:
-  pepper-ctl ping                            Health check
-  pepper-ctl snapshot                        List interactive elements
-  pepper-ctl tree --depth 3                  View hierarchy (limited depth)
-  pepper-ctl tap --text "Sign In"            Tap element by label text
-  pepper-ctl tap --id start_button           Tap element by accessibility ID
-  pepper-ctl tap --class button --index 2    Tap 3rd button on screen
-  pepper-ctl tap --point 200,400             Tap at screen coordinates
-  pepper-ctl input --text Email --value "a@b" Set text field by label
-  pepper-ctl navigate --screen settings      Navigate to screen
-  pepper-ctl scroll --direction down         Scroll down
-  pepper-ctl look                            Compact screen summary (what's tappable)
-  pepper-ctl read --id label_name            Read element value
-  pepper-ctl batch --file commands.json      Run batch commands
-  pepper-ctl wait-for-server                 Block until server is reachable
-  pepper-ctl test-report -f tests.json       Run tests, output JUnit XML
-  pepper-ctl test-report -f t.json --format json -o results.json
-  pepper-ctl ci-run                          Wait + smoke test + exit code
-  pepper-ctl ci-run -f custom.json -o r.xml  Custom tests, save results
-  pepper-ctl help                            List server commands
+  habanero-ctl ping                            Health check
+  habanero-ctl snapshot                        List interactive elements
+  habanero-ctl tree --depth 3                  View hierarchy (limited depth)
+  habanero-ctl tap --text "Sign In"            Tap element by label text
+  habanero-ctl tap --id start_button           Tap element by accessibility ID
+  habanero-ctl tap --class button --index 2    Tap 3rd button on screen
+  habanero-ctl tap --point 200,400             Tap at screen coordinates
+  habanero-ctl input --text Email --value "a@b" Set text field by label
+  habanero-ctl navigate --screen settings      Navigate to screen
+  habanero-ctl scroll --direction down         Scroll down
+  habanero-ctl look                            Compact screen summary (what's tappable)
+  habanero-ctl read --id label_name            Read element value
+  habanero-ctl batch --file commands.json      Run batch commands
+  habanero-ctl wait-for-server                 Block until server is reachable
+  habanero-ctl test-report -f tests.json       Run tests, output JUnit XML
+  habanero-ctl test-report -f t.json --format json -o results.json
+  habanero-ctl ci-run                          Wait + smoke test + exit code
+  habanero-ctl ci-run -f custom.json -o r.xml  Custom tests, save results
+  habanero-ctl help                            List server commands
 """,
     )
     parser.add_argument(
@@ -320,7 +320,7 @@ def build_parser():
     sub.add_parser("help", help="List all available commands from the server")
 
     # wait-for-server
-    p = sub.add_parser("wait-for-server", help="Wait until Pepper server is reachable (health check)")
+    p = sub.add_parser("wait-for-server", help="Wait until Habanero server is reachable (health check)")
     p.add_argument("--interval", type=float, default=1.0, help="Seconds between retries (default: 1.0)")
     p.add_argument("--wait-timeout", type=int, default=30, help="Max seconds to wait (default: 30)")
 
@@ -382,10 +382,10 @@ def build_parser():
     # --- Device management (local, no server connection needed) ---
 
     # register-device
-    p = sub.add_parser("register-device", help="Register a physical device endpoint for Pepper discovery")
+    p = sub.add_parser("register-device", help="Register a physical device endpoint for Habanero discovery")
     p.add_argument("--udid", required=True, help="Device UDID (from devicectl or Xcode)")
     p.add_argument("--host", required=True, help="Device IP or hostname (use localhost for iproxy)")
-    p.add_argument("--port", type=int, required=True, help="Pepper WebSocket port on the device")
+    p.add_argument("--port", type=int, required=True, help="Habanero WebSocket port on the device")
     p.add_argument("--name", default="", help="Human-readable device name (optional)")
     p.add_argument("--via", default="", choices=["wifi", "usb", ""], help="Connection method (optional, for display)")
 
@@ -394,7 +394,7 @@ def build_parser():
     p.add_argument("--udid", required=True, help="Device UDID to remove")
 
     # list-instances
-    sub.add_parser("list-instances", help="List all live Pepper instances (simulators + devices)")
+    sub.add_parser("list-instances", help="List all live Habanero instances (simulators + devices)")
 
     return parser
 
@@ -1285,10 +1285,10 @@ async def cmd_unregister_device(args):
 
 
 async def cmd_list_instances(args):
-    """List all live Pepper instances."""
+    """List all live Habanero instances."""
     instances = _list_instances()
     if not instances:
-        print(yellow("No live Pepper instances found."))
+        print(yellow("No live Habanero instances found."))
         return
     for inst in instances:
         kind = inst.get("kind", "?")

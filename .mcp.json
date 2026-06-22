@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "pepper": {
+    "habanero": {
       "command": "./.venv/bin/python3",
       "args": ["./tools/pepper-mcp"],
       "env": {
@@ -12,7 +12,7 @@
       "args": [
         "@playwright/mcp",
         "--headless",
-        "--user-data-dir", "${HOME}/.pepper/chrome-profile"
+        "--user-data-dir", "${HOME}/.habanero/chrome-profile"
       ]
     }
   }

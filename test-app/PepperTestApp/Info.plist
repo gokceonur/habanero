@@ -28,12 +28,12 @@
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Pepper test app needs calendar access for swizzle testing</string>
 	<key>NSUserTrackingUsageDescription</key>
-	<string>Pepper test app needs tracking permission for swizzle testing</string>
+	<string>Habanero test app needs tracking permission for swizzle testing</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Pepper uses the local network to advertise its debug server for device-to-host discovery.</string>
+	<string>Habanero uses the local network to advertise its debug server for device-to-host discovery.</string>
 	<key>NSBonjourServices</key>
 	<array>
-		<string>_pepper._tcp</string>
+		<string>_habanero._tcp</string>
 	</array>
 </dict>
 </plist>

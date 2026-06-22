@@ -1,4 +1,4 @@
-"""Register Pepper skills as MCP prompts so they're available in any connected repo."""
+"""Register Habanero skills as MCP prompts so they're available in any connected repo."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ _SKILLS = [
     ),
     (
         "babysit",
-        "Proactive health monitoring, drift detection, and issue management for the Pepper project",
+        "Proactive health monitoring, drift detection, and issue management for the Habanero project",
         "babysit",
         False,
     ),
@@ -28,15 +28,15 @@ _SKILLS = [
 def _read_skill(dirname: str) -> str | None:
     """Read a SKILL.md file, stripping YAML frontmatter. Returns None if not found.
 
-    Resolves the tracked package data first (`pepper_ios/skills/<dir>/SKILL.md`,
+    Resolves the tracked package data first (`habanero/skills/<dir>/SKILL.md`,
     bundled into the wheel), then falls back to a dev checkout's
     `.claude/skills/` directory for parity with upstream layouts.
     """
     text: str | None = None
 
-    # Package data: tracked in-repo at pepper_ios/skills/, bundled into the wheel.
+    # Package data: tracked in-repo at habanero/skills/, bundled into the wheel.
     try:
-        pkg_skill = resources.files("pepper_ios") / "skills" / dirname / "SKILL.md"
+        pkg_skill = resources.files("habanero") / "skills" / dirname / "SKILL.md"
         if pkg_skill.is_file():
             text = pkg_skill.read_text(encoding="utf-8")
     except (FileNotFoundError, ModuleNotFoundError, AttributeError):
@@ -44,7 +44,11 @@ def _read_skill(dirname: str) -> str | None:
 
     # Dev-checkout fallback: <repo>/.claude/skills/<dirname>/SKILL.md
     if text is None:
-        root = os.environ.get("PEPPER_ROOT", str(Path(__file__).resolve().parent.parent))
+        root = (
+            os.environ.get("HABANERO_ROOT")
+            or os.environ.get("PEPPER_ROOT")
+            or str(Path(__file__).resolve().parent.parent)
+        )
         path = Path(root) / ".claude" / "skills" / dirname / "SKILL.md"
         if path.is_file():
             text = path.read_text(encoding="utf-8")

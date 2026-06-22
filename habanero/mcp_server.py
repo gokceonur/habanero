@@ -1,12 +1,12 @@
 """
-Pepper MCP Server — exposes Pepper's runtime control as native MCP tools.
+Habanero MCP Server — exposes Habanero's runtime control as native MCP tools.
 
-Connects to the Pepper dylib's WebSocket server running inside an iOS simulator app.
-Each tool maps to a Pepper command, with typed parameters and structured responses.
+Connects to the Habanero dylib's WebSocket server running inside an iOS simulator app.
+Each tool maps to a Habanero command, with typed parameters and structured responses.
 
 Usage:
-  pepper-mcp                    # via pip install entry point
-  python -m pepper_ios.mcp_server  # direct module invocation
+  habanero-mcp                    # via pip install entry point
+  python -m habanero.mcp_server  # direct module invocation
 
 Multiple simulators: tools accept an optional `simulator` parameter (UDID).
 If omitted and exactly one sim is running, auto-discovers. If multiple, returns
@@ -19,7 +19,8 @@ import asyncio
 import json
 
 # Suppress all stdout except MCP protocol — critical for stdio transport
-# Logs go to stderr (safe for MCP stdio transport). Set PEPPER_DEBUG=1 for verbose output.
+# Logs go to stderr (safe for MCP stdio transport). Set HABANERO_DEBUG=1
+# (legacy PEPPER_DEBUG) for verbose output.
 import logging
 import os
 import sys
@@ -82,14 +83,18 @@ from .mcp_tools_ui_query import register_ui_query_tools
 from .pepper_websocket import CrashError, make_command
 from .pepper_websocket import send_command as ws_send_command
 
-_log_level = logging.DEBUG if os.environ.get("PEPPER_DEBUG") else logging.WARNING
+_log_level = (
+    logging.DEBUG
+    if os.environ.get("HABANERO_DEBUG") or os.environ.get("PEPPER_DEBUG")
+    else logging.WARNING
+)
 logging.basicConfig(
     stream=sys.stderr,
     level=_log_level,
-    format="[pepper] %(asctime)s %(levelname)s %(name)s: %(message)s",
+    format="[habanero] %(asctime)s %(levelname)s %(name)s: %(message)s",
     datefmt="%H:%M:%S",
 )
-logger = logging.getLogger("pepper_mcp")
+logger = logging.getLogger("habanero_mcp")
 
 try:
     from mcp.server.fastmcp import FastMCP
@@ -112,6 +117,7 @@ from .pepper_common import (
     PEPPER_DIR,
     discover_instance,
     get_config,
+    habanero_home_dir,
     json_dumps,
     load_env,
     resolve_adapter_dir,
@@ -131,8 +137,8 @@ def load_adapter_tools() -> list[dict]:
     """Load adapter-specific tool definitions.
 
     Searches (in order):
-    1. ~/.pepper/adapters/{type}/tools.json (co-located with adapter)
-    2. ~/.pepper/tools/{adapter_type}.json (legacy location)
+    1. ~/.habanero/adapters/{type}/tools.json (co-located with adapter)
+    2. ~/.habanero/tools/{adapter_type}.json (legacy ~/.pepper honored)
 
     Uses the session's active adapter (set by build_and_deploy), falling back to .env.
     """
@@ -148,7 +154,7 @@ def load_adapter_tools() -> list[dict]:
         if os.path.exists(candidate):
             tools_path = candidate
     if not tools_path:
-        candidate = os.path.join(os.path.expanduser("~"), ".pepper", "tools", f"{adapter_type}.json")
+        candidate = habanero_home_dir("tools", f"{adapter_type}.json")
         if os.path.exists(candidate):
             tools_path = candidate
     if not tools_path:
@@ -186,7 +192,7 @@ def load_adapter_preamble() -> str:
     """Load adapter-specific MCP preamble.
 
     Searches (in order):
-    1. ~/.pepper/adapters/{type}/mcp-preamble.md (adapter repo)
+    1. ~/.habanero/adapters/{type}/mcp-preamble.md (legacy ~/.pepper) (adapter repo)
     2. ADAPTER_PATH/mcp-preamble.md (legacy external path)
     3. dylib/{adapter_type}/mcp-preamble.md (in-tree fallback)
     Returns the content or empty string if no preamble found.
@@ -195,7 +201,7 @@ def load_adapter_preamble() -> str:
     if adapter_type == "generic":
         return ""
 
-    # Check resolved adapter dir (covers both ~/.pepper/adapters/ and ADAPTER_PATH)
+    # Check resolved adapter dir (covers both ~/.habanero (legacy ~/.pepper) adapters/ and ADAPTER_PATH)
     adapter_dir = resolve_adapter_dir(adapter_type)
     if adapter_dir:
         preamble = os.path.join(adapter_dir, "mcp-preamble.md")
@@ -766,7 +772,7 @@ _CORE_INSTRUCTIONS = (
 _adapter_preamble = load_adapter_preamble()
 _instructions = _CORE_INSTRUCTIONS + ("\n\n" + _adapter_preamble if _adapter_preamble else "")
 
-mcp = FastMCP("pepper", instructions=_instructions)
+mcp = FastMCP("habanero", instructions=_instructions)
 
 # ---------------------------------------------------------------------------
 # Tool usage logging — wraps call_tool to record every invocation
@@ -909,7 +915,7 @@ def actions_reference() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Dynamic adapter tools (from ~/.pepper/tools/{adapter_type}.json)
+# Dynamic adapter tools (from ~/.habanero/tools/{adapter_type}.json, legacy ~/.pepper)
 # ---------------------------------------------------------------------------
 
 
@@ -1106,7 +1112,7 @@ async def build_and_deploy(
 
 
 def main():
-    """Entry point for the pepper-mcp command."""
+    """Entry point for the habanero-mcp command."""
     import atexit
 
     def _cleanup_session():

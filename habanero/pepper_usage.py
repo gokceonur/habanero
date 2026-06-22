@@ -1,4 +1,4 @@
-"""Tool usage logging — appends to ~/.pepper/tool_usage.jsonl on every MCP tool call."""
+"""Tool usage logging — appends to ~/.habanero/tool_usage.jsonl (legacy ~/.pepper) on every MCP tool call."""
 
 from __future__ import annotations
 
@@ -7,9 +7,12 @@ import os
 import time
 import uuid
 
+from .pepper_common import habanero_home_dir
+
 _SESSION_ID = uuid.uuid4().hex[:12]
-_USAGE_DIR = os.path.join(os.path.expanduser("~"), ".pepper")
-_USAGE_PATH = os.path.join(_USAGE_DIR, "tool_usage.jsonl")
+# Append to the canonical ~/.habanero log, or the legacy ~/.pepper one if it exists.
+_USAGE_PATH = habanero_home_dir("tool_usage.jsonl")
+_USAGE_DIR = os.path.dirname(_USAGE_PATH)
 
 
 def log_tool_call(tool_name: str) -> None:

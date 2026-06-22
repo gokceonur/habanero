@@ -1,4 +1,4 @@
-# pepper Makefile
+# habanero Makefile
 # Runtime control for iOS apps — dylib injection
 
 # Load .env if present; .env.local overrides (machine-local, gitignored)
@@ -19,7 +19,7 @@ PORT          ?= $(shell echo "$(SIMULATOR_ID)" | python3 -c "import sys,hashlib
 PROJECT_DIR := $(shell pwd)
 TOOLS_DIR   := $(PROJECT_DIR)/tools
 CONTROL_DIR := $(PROJECT_DIR)/dylib
-DYLIB_PATH  := $(PROJECT_DIR)/build/Pepper.framework/Pepper
+DYLIB_PATH  := $(PROJECT_DIR)/build/Habanero.framework/Habanero
 
 LOGS_DIR    := $(PROJECT_DIR)/build/logs
 
@@ -42,12 +42,12 @@ WIKI_BUNDLE_ID := org.wikimedia.wikipedia
 
 ## help: Show all available targets
 help:
-	@echo "pepper — Runtime control for iOS apps (dylib injection)"
+	@echo "habanero — Runtime control for iOS apps (dylib injection)"
 	@echo ""
 	@echo "Quick start:"
 	@echo "  make deploy     Build dylib + inject into running app"
-	@echo "  make build      Build the Pepper dylib (fast — seconds)"
-	@echo "  make launch     Launch app with Pepper injected"
+	@echo "  make build      Build the Habanero dylib (fast — seconds)"
+	@echo "  make launch     Launch app with Habanero injected"
 	@echo "  make ping       Verify control plane is responding"
 	@echo ""
 	@echo "All targets:"
@@ -71,26 +71,26 @@ setup:
 # Build
 # ============================================================
 
-## build: Build Pepper.framework dylib
+## build: Build Habanero.framework dylib
 build:
 	@bash "$(TOOLS_DIR)/build-dylib.sh"
 
-## xcframework: Build Pepper.xcframework (device + simulator)
+## xcframework: Build Habanero.xcframework (device + simulator)
 xcframework:
 	@bash "$(TOOLS_DIR)/build-xcframework.sh"
 
-## build-device: Build Pepper.framework for physical iOS devices (arm64)
+## build-device: Build Habanero.framework for physical iOS devices (arm64)
 build-device:
 	@bash "$(TOOLS_DIR)/build-dylib.sh" --device
 
-## launch: Launch app on simulator with Pepper injected
+## launch: Launch app on simulator with Habanero injected
 launch:
 	@if [ ! -f "$(DYLIB_PATH)" ]; then \
-		echo "Pepper.framework not found. Run 'make build' first." >&2; \
+		echo "Habanero.framework not found. Run 'make build' first." >&2; \
 		exit 1; \
 	fi
 	@python3 "$(TOOLS_DIR)/check-sim-available.py" "$(SIMULATOR_ID)" "$(TOOLS_DIR)"
-	@echo "Launching $(BUNDLE_ID) on $(SIMULATOR_ID) with Pepper injection..."
+	@echo "Launching $(BUNDLE_ID) on $(SIMULATOR_ID) with Habanero injection..."
 	-@xcrun simctl terminate "$(SIMULATOR_ID)" "$(BUNDLE_ID)" 2>/dev/null
 	@open -a Simulator --args -CurrentDeviceUDID "$(SIMULATOR_ID)" 2>/dev/null || true
 	@xcrun simctl bootstatus "$(SIMULATOR_ID)" -b 2>/dev/null || sleep 2
@@ -102,13 +102,23 @@ launch:
 	@# DYLD_INSERT_LIBRARIES is a restricted var — launchctl setenv silently drops it.
 	@# Inject via SIMCTL_CHILD_ at exec() time instead (see simctl launch call below).
 	@# Non-DYLD_ vars work fine via launchctl setenv.
+	@# Emit the canonical HABANERO_* names plus legacy PEPPER_* for back-compat;
+	@# the dylib reads HABANERO_* first and falls back to PEPPER_*.
+	@xcrun simctl spawn "$(SIMULATOR_ID)" launchctl setenv HABANERO_PORT "$(PORT)"
+	@xcrun simctl spawn "$(SIMULATOR_ID)" launchctl setenv HABANERO_SIM_UDID "$(SIMULATOR_ID)"
+	@xcrun simctl spawn "$(SIMULATOR_ID)" launchctl setenv HABANERO_ADAPTER "$(ADAPTER_TYPE)"
 	@xcrun simctl spawn "$(SIMULATOR_ID)" launchctl setenv PEPPER_PORT "$(PORT)"
 	@xcrun simctl spawn "$(SIMULATOR_ID)" launchctl setenv PEPPER_SIM_UDID "$(SIMULATOR_ID)"
 	@xcrun simctl spawn "$(SIMULATOR_ID)" launchctl setenv PEPPER_ADAPTER "$(ADAPTER_TYPE)"
 	@if [ -n "$${PEPPER_AGENT_TYPE}" ]; then \
+		xcrun simctl spawn "$(SIMULATOR_ID)" launchctl setenv HABANERO_SKIP_PERMISSIONS 1; \
 		xcrun simctl spawn "$(SIMULATOR_ID)" launchctl setenv PEPPER_SKIP_PERMISSIONS 1; \
 	fi
 	@LAUNCH_OUTPUT=$$(SIMCTL_CHILD_DYLD_INSERT_LIBRARIES="$(DYLIB_PATH)" \
+		SIMCTL_CHILD_HABANERO_PORT="$(PORT)" \
+		SIMCTL_CHILD_HABANERO_SIM_UDID="$(SIMULATOR_ID)" \
+		SIMCTL_CHILD_HABANERO_ADAPTER="$(ADAPTER_TYPE)" \
+		SIMCTL_CHILD_HABANERO_SKIP_PERMISSIONS="$${PEPPER_AGENT_TYPE:+1}" \
 		SIMCTL_CHILD_PEPPER_PORT="$(PORT)" \
 		SIMCTL_CHILD_PEPPER_SIM_UDID="$(SIMULATOR_ID)" \
 		SIMCTL_CHILD_PEPPER_ADAPTER="$(ADAPTER_TYPE)" \
@@ -118,6 +128,10 @@ launch:
 			echo "App not installed on $(SIMULATOR_ID). Auto-installing..."; \
 			$(MAKE) test-app SIMULATOR_ID="$(SIMULATOR_ID)" && \
 			LAUNCH_OUTPUT=$$(SIMCTL_CHILD_DYLD_INSERT_LIBRARIES="$(DYLIB_PATH)" \
+				SIMCTL_CHILD_HABANERO_PORT="$(PORT)" \
+				SIMCTL_CHILD_HABANERO_SIM_UDID="$(SIMULATOR_ID)" \
+				SIMCTL_CHILD_HABANERO_ADAPTER="$(ADAPTER_TYPE)" \
+				SIMCTL_CHILD_HABANERO_SKIP_PERMISSIONS="$${PEPPER_AGENT_TYPE:+1}" \
 				SIMCTL_CHILD_PEPPER_PORT="$(PORT)" \
 				SIMCTL_CHILD_PEPPER_SIM_UDID="$(SIMULATOR_ID)" \
 				SIMCTL_CHILD_PEPPER_ADAPTER="$(ADAPTER_TYPE)" \
@@ -129,6 +143,10 @@ launch:
 			echo "$$LAUNCH_OUTPUT" >&2; exit 1; \
 		fi; \
 	}; echo "$$LAUNCH_OUTPUT"
+	@xcrun simctl spawn "$(SIMULATOR_ID)" launchctl unsetenv HABANERO_PORT
+	@xcrun simctl spawn "$(SIMULATOR_ID)" launchctl unsetenv HABANERO_SIM_UDID
+	@xcrun simctl spawn "$(SIMULATOR_ID)" launchctl unsetenv HABANERO_ADAPTER
+	@xcrun simctl spawn "$(SIMULATOR_ID)" launchctl unsetenv HABANERO_SKIP_PERMISSIONS 2>/dev/null || true
 	@xcrun simctl spawn "$(SIMULATOR_ID)" launchctl unsetenv PEPPER_PORT
 	@xcrun simctl spawn "$(SIMULATOR_ID)" launchctl unsetenv PEPPER_SIM_UDID
 	@xcrun simctl spawn "$(SIMULATOR_ID)" launchctl unsetenv PEPPER_ADAPTER
@@ -155,7 +173,7 @@ deploy: build launch
 	@echo ""
 	@echo "Deploy complete. Run 'make ping' to verify control plane."
 
-## test-deploy: Build test app + build dylib + launch with Pepper injected
+## test-deploy: Build test app + build dylib + launch with Habanero injected
 test-deploy: test-app build
 	@$(MAKE) launch BUNDLE_ID=$(TEST_APP_BUNDLE)
 
@@ -174,12 +192,12 @@ lint:
 
 ## lint-py: Run ruff linter on Python code
 lint-py:
-	@ruff check pepper_ios/ tools/ scripts/gen-coverage.py scripts/gen-pepper-commands.py
+	@ruff check habanero/ tools/ scripts/gen-coverage.py scripts/gen-pepper-commands.py
 
 ## fmt-py: Format Python code with ruff
 fmt-py:
-	@ruff format pepper_ios/ tools/ scripts/gen-coverage.py scripts/gen-pepper-commands.py
-	@ruff check --fix pepper_ios/ tools/ scripts/gen-coverage.py scripts/gen-pepper-commands.py
+	@ruff format habanero/ tools/ scripts/gen-coverage.py scripts/gen-pepper-commands.py
+	@ruff check --fix habanero/ tools/ scripts/gen-coverage.py scripts/gen-pepper-commands.py
 
 ## check-tools: Verify every MCP tool has a matching dylib handler
 check-tools:
@@ -255,7 +273,7 @@ test-app:
 	if [ -z "$$APP" ]; then echo "Build failed — app not found." >&2; exit 1; fi; \
 	echo "Installing on $(SIMULATOR_ID)..."; \
 	xcrun simctl install "$(SIMULATOR_ID)" "$$APP"; \
-	echo "PepperTestApp installed. Run 'make deploy BUNDLE_ID=$(TEST_APP_BUNDLE)' to inject Pepper."
+	echo "PepperTestApp installed. Run 'make deploy BUNDLE_ID=$(TEST_APP_BUNDLE)' to inject Habanero."
 
 ## demo: Run interactive demo walkthrough (build + inject + observe + interact)
 demo:
@@ -264,7 +282,7 @@ demo:
 ## logs: Tail simulator system log for the injected app
 logs:
 	@xcrun simctl spawn "$(SIMULATOR_ID)" log stream \
-		--predicate 'subsystem CONTAINS "pepper"' \
+		--predicate 'subsystem CONTAINS "habanero"' \
 		--level debug
 
 # ============================================================
@@ -372,7 +390,7 @@ coverage:
 coverage-check:
 	@python3 "$(PROJECT_DIR)/scripts/gen-coverage.py" --check
 
-## commands: Regenerate pepper_ios/pepper_commands.py from Swift handlers
+## commands: Regenerate habanero/pepper_commands.py from Swift handlers
 commands:
 	@PEPPER_REGEN=1 python3 "$(PROJECT_DIR)/scripts/gen-pepper-commands.py"
 
@@ -394,11 +412,11 @@ clean:
 wikipedia-setup:
 	@bash "$(PROJECT_DIR)/scripts/setup-wikipedia.sh"
 
-## wikipedia-deploy: Build dylib + launch Wikipedia with Pepper injected
+## wikipedia-deploy: Build dylib + launch Wikipedia with Habanero injected
 wikipedia-deploy: build
 	@$(MAKE) launch BUNDLE_ID=$(WIKI_BUNDLE_ID)
 
-## wikipedia-smoke: Run smoke tests against Wikipedia with Pepper
+## wikipedia-smoke: Run smoke tests against Wikipedia with Habanero
 wikipedia-smoke:
 	@python3 "$(TOOLS_DIR)/pepper-ctl" --port $(PORT) \
 		test-report --file "$(PROJECT_DIR)/scripts/wikipedia-smoke.json" \

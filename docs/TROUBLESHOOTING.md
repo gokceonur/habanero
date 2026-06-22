@@ -5,8 +5,8 @@
 **No simulator booted.**
 Boot a simulator in Xcode or run `open -a Simulator`, then try again.
 
-**App not running with Pepper injected.**
-`make ping` connects to the in-process WebSocket server, which only exists when the app was launched via `make launch` or `make deploy`. Running the app from Xcode won't inject Pepper. Run `make deploy` and retry.
+**App not running with Habanero injected.**
+`make ping` connects to the in-process WebSocket server, which only exists when the app was launched via `make launch` or `make deploy`. Running the app from Xcode won't inject Habanero. Run `make deploy` and retry.
 
 **Wrong port.**
 The port is derived from `SIMULATOR_ID`. If you have multiple simulators, `make ping` may be targeting the wrong one. Check:
@@ -33,7 +33,7 @@ APP_BUNDLE_ID=com.example.yourapp
 ```
 
 **Dylib not built.**
-Run `make build` first. The dylib must exist at `build/Pepper.framework/Pepper` before launch.
+Run `make build` first. The dylib must exist at `build/Habanero.framework/Habanero` before launch.
 
 **App wasn't terminated before relaunch.**
 `make launch` terminates the app first, but if something went wrong, kill it manually and relaunch:
@@ -113,7 +113,7 @@ python3 -m venv .venv
 ## MCP server not connecting
 
 **Wrong path in MCP config.**
-The `command` in your MCP client config must point to `.venv/bin/python3` inside the Pepper repo. Relative paths don't work — use the absolute path.
+The `command` in your MCP client config must point to `.venv/bin/python3` inside the Habanero repo. Relative paths don't work — use the absolute path.
 
 **`.venv` missing deps.**
 Verify the MCP server dependencies are installed:

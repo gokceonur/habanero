@@ -32,26 +32,6 @@ alone, without the original session's context.
 
 ## Open
 
-### BUG-002 — Internal `pepper`/`Pepper` identifiers survive the rebrand (cosmetic + future-coupling)
-- **Status:** OPEN
-- **Severity:** low
-- **Area:** `pepper_ios/` package dir, CLI `prog`/description strings, `PEPPER_*`
-  env vars, `Pepper.framework` dylib name, `~/.pepper/` config dir.
-- **Filed:** 2026-06-22
-- **Symptom:** the command surface is renamed (`habanero-mcp` / `habanero-ctl` /
-  MCP server `habanero`), but internals still say pepper: `habanero-ctl --help`
-  prints `usage: pepper-ctl …`; the import package is `pepper_ios`; the dylib is
-  `Pepper.framework`; env contract is `PEPPER_PORT` / `PEPPER_SIM_UDID` /
-  `PEPPER_ADAPTER` / `PEPPER_DYLIB_PATH`; shared state lives in `~/.pepper/`.
-- **Repro:** `habanero-ctl --help` (see `pepper-ctl` in usage).
-- **Expected:** a fully self-consistent `habanero` identity.
-- **Notes:** intentionally deferred — the `PEPPER_*` env vars + `Pepper.framework`
-  name are a **contract shared between the Python side and the Swift dylib**;
-  renaming them requires changing both sides in lockstep (loader, `mcp_build.py`,
-  `Makefile`, `tools/build-dylib.sh`, every `dylib/**` reader). Do this as one
-  atomic "deep rename" change, not piecemeal. Low-risk subset that can land first:
-  argparse `prog=`/description strings + user-facing log text.
-
 ### BUG-003 — No dev-dependency spec: documented test/lint gates fail out-of-box
 - **Status:** OPEN
 - **Severity:** low
@@ -99,3 +79,65 @@ alone, without the original session's context.
   `tools/tests/test_skill_bundling.py` (fails on the unbundled state, passes now).
   Verified: clean-clone `pipx install --editable` succeeds; a built wheel contains
   both SKILL.md files; `make py-test` green (150 passed).
+
+### BUG-002 — Internal `pepper`/`Pepper` identifiers survive the rebrand (cosmetic + future-coupling)
+- **Status:** FIXED (branch `fix/bug-002-deep-rename`)
+- **Severity:** low
+- **Area:** package dir, CLI `prog`/usage, `PEPPER_*` env contract, `Pepper.framework`,
+  `~/.pepper/`, log subsystem, Bonjour service type, `dylib_fetch` repo.
+- **Filed:** 2026-06-22
+- **Symptom:** the command surface was renamed (`habanero-mcp`/`habanero-ctl`/MCP
+  server `habanero`) but internals still said pepper: `habanero-ctl --help` printed
+  `usage: pepper-ctl …`; import package `pepper_ios`; dylib `Pepper.framework`; env
+  contract `PEPPER_*`; shared state `~/.pepper/`.
+- **Expected:** a fully self-consistent `habanero` identity.
+- **Fix (renamed surfaces):**
+  - **Python package** `pepper_ios/` → `habanero/` (`git mv`, history preserved);
+    fixed `importlib.resources.files("habanero")`, `pyproject` `packages` + entry
+    points, ruff per-file globs, every external `pepper_ios` import (tools/, scripts/,
+    .github/, tests). Internal `pepper_*.py` module **filenames kept** (intra-package
+    imports are relative; renaming them is churn with no identity payoff).
+  - **CLI** argparse `prog`/description/epilog in `ctl.py`, `test_runner.py`, the
+    `FastMCP("habanero")` server name, module/log identity in `mcp_server.py`.
+  - **Env contract — back-compat shim:** the Swift dylib now reads `HABANERO_<X>`
+    first and falls back to legacy `PEPPER_<X>` via a single `habaneroEnv()` helper
+    (all 6 runtime reads: ADAPTER/SKIP_PERMISSIONS/PORT/SIM_UDID/AUTO_DISMISS_DIALOGS/
+    SAFE_MODE/OBSERVE_PORT). Every emit site emits **both** names (`Makefile`,
+    `mcp_build.py`, `test_lifecycle.py`, `ci.sh`, `real-app-smoke.sh`, `inject-xcode-scheme.py`).
+    Python reads `HABANERO_DYLIB_PATH`/`HABANERO_ROOT`/`HABANERO_DEBUG` with legacy
+    fallback. Compilation-condition flags (`-DPEPPER_CONTROL`/`-DPEPPER`/`PEPPER_HAS_ADAPTER`)
+    left unchanged (internal build flags, not the env contract).
+  - **Framework** `Pepper.framework` → `Habanero.framework` (build-dylib.sh +
+    build-xcframework.sh: output dir, `-module-name`, swiftmodule, bridging header,
+    `-install_name @rpath/Habanero.framework/Habanero`, Info.plist
+    CFBundleName/Executable/Identifier=`com.habanero.control`; Python `_find_dylib`,
+    `pepper_common`, `dylib_fetch` FRAMEWORK_NAME + binary name; Makefile DYLIB_PATH;
+    CI scripts; release.yml asset; embed-pepper.sh; the in-dylib `strstr(…,"Habanero.framework")`
+    image filter). C entry symbol `PepperBootstrap` **kept** (internal dyld entry).
+  - **Log subsystem** `com.pepper.control` → `com.habanero.control` (PepperAppConfig
+    default + 2 direct `os_log_create` + console self-filter guard + Makefile `logs`
+    predicate). DispatchQueue labels kept (debug-only, not log-filtered).
+  - **Bonjour service type** `_pepper._tcp.` → `_habanero._tcp.` in lockstep
+    (Swift advertiser + Python `dns-sd` browser + test-app `NSBonjourServices`).
+  - **`dylib_fetch` GITHUB_REPO** `skwallace36/Pepper` → `gokceonur/habanero`;
+    release.yml public repo + mcp-registry/smithery manifests repointed.
+  - **`~/.pepper/` → `~/.habanero/` read-both** via `habanero_home_dir()` (adapters,
+    scripts, tools, usage log, frameworks cache, chrome-profile): prefers
+    `~/.habanero`, falls back to legacy `~/.pepper` **per-subpath** when present —
+    never moves/deletes the populated legacy dir.
+  - Docs (README/DYLIB.md/TOOLS.md/TROUBLESHOOTING.md/CLAUDE.md/babysit) rebranded.
+- **Deliberately kept (internal, not identity-facing):** internal Swift type names
+  (`PepperPlane`, `PepperLoader`, …), the `PepperBootstrap`/`_PepperAdapterShim`
+  symbols, internal `pepper_*.py`/`pepper_keyWindow`/`pepperEquals` symbols,
+  `/tmp/pepper-*` IPC paths, the `PepperTestApp` fixture (project/scheme/bundle
+  `com.pepper.testapp`), `tools/pepper-*` dev wrapper filenames + `scripts/pepper-task`
+  + `.pepper-kill`, host-orchestration vars (`PEPPER_AGENT_TYPE`/`PEPPER_MAX_SIMS`/
+  `PEPPER_CONNECT`/…) read only by `scripts/`. Renaming these is churn with no
+  identity payoff and (for the IPC/contract names) regression risk.
+- **Verified green:** `make build` → `build/Habanero.framework/Habanero` (install_name
+  `@rpath/Habanero.framework/Habanero`, module `Habanero`); `habanero-ctl --help`
+  shows habanero (0 `pepper-ctl`); all 3 entry points + FastMCP `habanero`/33 tools;
+  `make test-deploy` injected the test app on a booted iPhone 15 (26.5), `habanero-ctl
+  --port 8869 ping` → `pong`, `look` → full screen dump; `pytest tools/tests` 150
+  passed; `make unit-test` 148 passed. Pre-existing (not regression): 3 `E501` in
+  `pepper_format.py` (also present on `main`; file unchanged here).

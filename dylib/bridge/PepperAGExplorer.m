@@ -64,7 +64,7 @@ static void resolveSymbols(void) {
     if (sResolved) return;
     sResolved = YES;
 
-    sLog = os_log_create("com.pepper.control", "ag-explorer");
+    sLog = os_log_create("com.habanero.control", "ag-explorer");
 
     // AttributeGraph symbols — the framework is already loaded by SwiftUI
     sAGGraphArchiveJSON     = (AGGraphArchiveJSON_fn)    dlsym(RTLD_DEFAULT, "AGGraphArchiveJSON");

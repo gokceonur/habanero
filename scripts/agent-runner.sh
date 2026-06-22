@@ -79,7 +79,7 @@ cleanup() {
     xcrun simctl terminate "$CLAIMED_SIM" "${APP_BUNDLE_ID:-com.pepper.testapp}" 2>/dev/null || true
     xcrun simctl shutdown "$CLAIMED_SIM" 2>/dev/null || true
     python3 -c "
-import sys; sys.path.insert(0, '$REPO_ROOT/pepper_ios')
+import sys; sys.path.insert(0, '$REPO_ROOT/habanero')
 from pepper_sessions import release_simulator
 release_simulator('$CLAIMED_SIM', pid=$$)
 " 2>/dev/null || true
@@ -355,7 +355,7 @@ esac
 if [ "$NEEDS_SIM" = true ]; then
   # 30s timeout prevents hanging if xcrun is stuck
   CLAIMED_SIM=$(python3 -c "
-import sys, signal; sys.path.insert(0, '$REPO_ROOT/pepper_ios')
+import sys, signal; sys.path.insert(0, '$REPO_ROOT/habanero')
 signal.alarm(30)
 from pepper_sessions import find_available_simulator, claim_simulator
 udid = find_available_simulator()

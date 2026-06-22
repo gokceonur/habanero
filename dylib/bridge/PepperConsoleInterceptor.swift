@@ -216,8 +216,8 @@ final class PepperConsoleInterceptor {
                 guard let logEntry = entry as? OSLogEntryLog else { continue }
                 // Skip entries at or before our last poll boundary
                 guard logEntry.date > since else { continue }
-                // Skip Pepper's own internal logs
-                guard logEntry.subsystem != "com.pepper.control" else { continue }
+                // Skip Habanero's own internal logs
+                guard logEntry.subsystem != "com.habanero.control" else { continue }
 
                 let message = logEntry.composedMessage
                 guard !message.isEmpty else { continue }

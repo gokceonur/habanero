@@ -19,8 +19,8 @@ except ImportError:
     sys.exit(1)
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from pepper_ios.pepper_common import DEFAULT_HOST
-from pepper_ios.pepper_common import discover_port as _discover_port
+from habanero.pepper_common import DEFAULT_HOST
+from habanero.pepper_common import discover_port as _discover_port
 
 
 def discover_port(simulator=None):

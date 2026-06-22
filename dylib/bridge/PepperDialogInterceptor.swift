@@ -69,8 +69,8 @@ final class PepperDialogInterceptor {
 
         // Skip authorization swizzles in agent mode — agents use simctl privacy
         // grant instead, and these swizzles trigger dialogs that block agents.
-        if ProcessInfo.processInfo.environment["PEPPER_SKIP_PERMISSIONS"] == "1" {
-            pepperLog.info("Skipping authorization swizzles (PEPPER_SKIP_PERMISSIONS=1)", category: .lifecycle)
+        if habaneroEnv("SKIP_PERMISSIONS") == "1" {
+            pepperLog.info("Skipping authorization swizzles (HABANERO_SKIP_PERMISSIONS=1)", category: .lifecycle)
             return
         }
 
