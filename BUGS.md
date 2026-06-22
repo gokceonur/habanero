@@ -49,6 +49,27 @@ alone, without the original session's context.
   ["pytest", "ruff", "pyright"]` (or a `requirements-dev.txt`) and point the
   Makefile/README at it (`pip install -e ".[dev]"`). Pin versions for reproducibility.
 
+### BUG-004 — `release.yml` PyPI publish + dylib auto-download point at unavailable targets
+- **Status:** OPEN
+- **Severity:** low
+- **Area:** `.github/workflows/release.yml`, `habanero/dylib_fetch.py`
+- **Filed:** 2026-06-22
+- **Symptom:** (a) the "Publish to PyPI" job twine-uploads distribution name
+  `habanero`, which is already an existing PyPI project (the Crossref API client),
+  so a tag-push release would 403 on upload. (b) `dylib_fetch.ensure_dylib()` now
+  resolves prebuilt frameworks from `gokceonur/habanero` GitHub Releases, which
+  don't exist yet — auto-download 404s and falls back to "build from source".
+- **Repro:** (a) push a version tag → release workflow PyPI step. (b) on a machine
+  with no local `make build`, import a path that calls `ensure_dylib()`.
+- **Expected:** a tagged release publishes cleanly and pip-only installs can fetch a
+  prebuilt dylib.
+- **Notes:** found during the BUG-002 rename. (a) rename the PyPI dist (e.g.
+  `habanero-ios`) or drop/disable the PyPI publish step — this is a private fork, so
+  local editable install may be all we need. (b) either cut a `gokceonur/habanero`
+  Release shipping `Habanero.framework.zip`, or make build-from-source the only
+  supported path and remove the download code. Local dev is unaffected today (the
+  dev-build path resolves before any download).
+
 ## Fixed
 
 ### BUG-001 — Source / editable install fails: force-include of gitignored `.claude/skills`
