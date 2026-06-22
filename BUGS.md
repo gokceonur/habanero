@@ -32,23 +32,6 @@ alone, without the original session's context.
 
 ## Open
 
-### BUG-003 — No dev-dependency spec: documented test/lint gates fail out-of-box
-- **Status:** OPEN
-- **Severity:** low
-- **Area:** `pyproject.toml` / `requirements.txt`, `Makefile` (`py-test`/`lint-py`/`check`), README
-- **Filed:** 2026-06-22
-- **Symptom:** a fresh contributor can't run the documented quality gates: `make
-  py-test` → `No module named pytest`, `make lint-py` → `ruff: command not found`,
-  `make typecheck` needs pyright. None of pytest/ruff/pyright are declared anywhere
-  (`requirements.txt` is runtime-only: `mcp` / `textual` / `websockets`).
-- **Repro:** clean clone → `make py-test` (or `make check`) without a manually
-  pre-provisioned dev toolchain.
-- **Expected:** one documented step installs the dev toolchain so the Makefile gates run.
-- **Notes:** found while verifying BUG-001 (had to hand-provision a throwaway venv
-  with pytest to run the suite). Fix: add `[project.optional-dependencies] dev =
-  ["pytest", "ruff", "pyright"]` (or a `requirements-dev.txt`) and point the
-  Makefile/README at it (`pip install -e ".[dev]"`). Pin versions for reproducibility.
-
 ### BUG-004 — `release.yml` PyPI publish + dylib auto-download point at unavailable targets
 - **Status:** OPEN
 - **Severity:** low
@@ -162,3 +145,31 @@ alone, without the original session's context.
   --port 8869 ping` → `pong`, `look` → full screen dump; `pytest tools/tests` 150
   passed; `make unit-test` 148 passed. Pre-existing (not regression): 3 `E501` in
   `pepper_format.py` (also present on `main`; file unchanged here).
+
+### BUG-003 — No dev-dependency spec: documented test/lint gates fail out-of-box
+- **Status:** FIXED (branch `fix/bug-003-dev-deps`)
+- **Severity:** low
+- **Area:** `pyproject.toml`, `Makefile` (`typecheck`), `README.md`, `tools/tests/`
+- **Filed:** 2026-06-22
+- **Symptom:** a fresh contributor can't run the documented quality gates: `make
+  py-test` → `No module named pytest`, `make lint-py` → `ruff: command not found`,
+  `make typecheck` needs a Node toolchain for `npx pyright`. None of pytest/ruff/pyright
+  were declared anywhere (`requirements.txt` is runtime-only).
+- **Expected:** one documented step installs the dev toolchain so the Makefile gates run.
+- **Fix:**
+  - Added `[project.optional-dependencies] dev = ["pytest~=9.1.1", "ruff~=0.15.18",
+    "pyright~=1.1.410"]` to `pyproject.toml`. Compatible-release (`~=`) pins keep the
+    gates reproducible — notably ruff, whose minor bumps add lint rules.
+  - Repointed `make typecheck` from `npx --yes pyright` to the pip-provided `pyright`
+    (the wrapper vendors its own Node via `nodeenv`), so the single `pip install -e
+    ".[dev]"` step provisions all three gates with no separate system-Node requirement,
+    and the analyzer version is pinned. CI's `npx --yes pyright` step left unchanged
+    (the CI runner already has Node) to keep the diff tight.
+  - Documented the one-step setup in README `## Development` (`pip install -e ".[dev]"`
+    → `make py-test` / `lint-py` / `typecheck`).
+  - Added regression test `tools/tests/test_dev_dependencies.py` (red on the
+    undeclared state; asserts the `dev` extras declare + version-pin the three tools).
+- **Verified green:** fresh venv → `pip install -e ".[dev]"` (editable install + dev
+  toolchain resolve: pytest 9.1.1 / ruff 0.15.18 / pyright 1.1.410) → `make py-test`
+  152 passed (150 baseline + 2 new), `make lint-py` runs (3 pre-existing `pepper_format.py`
+  E501 only — present on `main`, new test file clean), `make typecheck` 0 errors.

@@ -228,7 +228,7 @@ fmt-check:
 
 ## typecheck: Run pyright type checker on Python code
 typecheck:
-	@npx --yes pyright
+	@pyright
 
 ## ci: Full boot → inject → test → teardown cycle
 ci:
