@@ -59,13 +59,3 @@ jobs:
             sleep 30
           done
           echo "::warning::Could not create public release — mirror may not have pushed tag yet"
-
-      - name: Publish to PyPI
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
-        run: |
-          python3 -m venv /tmp/pypi-venv
-          /tmp/pypi-venv/bin/pip install --quiet build twine
-          /tmp/pypi-venv/bin/python -m build
-          /tmp/pypi-venv/bin/twine upload --skip-existing dist/*

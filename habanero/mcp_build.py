@@ -456,11 +456,7 @@ async def deploy_app(
     if not bid:
         return "No bundle ID configured. Set APP_BUNDLE_ID in pepper/.env"
     if not os.path.exists(dylib):
-        try:
-            from .dylib_fetch import ensure_dylib
-            dylib = ensure_dylib()
-        except Exception as e:
-            return f"Habanero dylib not found at {dylib} and auto-download failed: {e}\nRun `make build` in habanero dir or check your habanero version."
+        return f"Habanero dylib not found at {dylib}\nRun `make build` in the habanero dir to build it from source."
 
     # Auto-rebuild dylib if source files are newer than the binary.
     # This ensures agents in other worktrees pick up Habanero fixes without

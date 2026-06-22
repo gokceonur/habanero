@@ -32,27 +32,6 @@ alone, without the original session's context.
 
 ## Open
 
-### BUG-004 — `release.yml` PyPI publish + dylib auto-download point at unavailable targets
-- **Status:** OPEN
-- **Severity:** low
-- **Area:** `.github/workflows/release.yml`, `habanero/dylib_fetch.py`
-- **Filed:** 2026-06-22
-- **Symptom:** (a) the "Publish to PyPI" job twine-uploads distribution name
-  `habanero`, which is already an existing PyPI project (the Crossref API client),
-  so a tag-push release would 403 on upload. (b) `dylib_fetch.ensure_dylib()` now
-  resolves prebuilt frameworks from `gokceonur/habanero` GitHub Releases, which
-  don't exist yet — auto-download 404s and falls back to "build from source".
-- **Repro:** (a) push a version tag → release workflow PyPI step. (b) on a machine
-  with no local `make build`, import a path that calls `ensure_dylib()`.
-- **Expected:** a tagged release publishes cleanly and pip-only installs can fetch a
-  prebuilt dylib.
-- **Notes:** found during the BUG-002 rename. (a) rename the PyPI dist (e.g.
-  `habanero-ios`) or drop/disable the PyPI publish step — this is a private fork, so
-  local editable install may be all we need. (b) either cut a `gokceonur/habanero`
-  Release shipping `Habanero.framework.zip`, or make build-from-source the only
-  supported path and remove the download code. Local dev is unaffected today (the
-  dev-build path resolves before any download).
-
 ## Fixed
 
 ### BUG-001 — Source / editable install fails: force-include of gitignored `.claude/skills`
@@ -173,3 +152,35 @@ alone, without the original session's context.
   toolchain resolve: pytest 9.1.1 / ruff 0.15.18 / pyright 1.1.410) → `make py-test`
   152 passed (150 baseline + 2 new), `make lint-py` runs (3 pre-existing `pepper_format.py`
   E501 only — present on `main`, new test file clean), `make typecheck` 0 errors.
+
+### BUG-004 — `release.yml` PyPI publish + dylib auto-download point at unavailable targets
+- **Status:** FIXED (branch `fix/bug-004-source-only-dist`)
+- **Severity:** low
+- **Area:** `.github/workflows/release.yml`, `habanero/dylib_fetch.py` (removed),
+  `habanero/__init__.py`, `habanero/mcp_build.py`, `README.md`, `scripts/release.sh`
+- **Filed:** 2026-06-22
+- **Symptom:** (a) the "Publish to PyPI" job twine-uploaded dist name `habanero`,
+  already owned by the Crossref client on PyPI → 403 on a tag-push release. (b)
+  `dylib_fetch.ensure_dylib()` auto-downloaded a prebuilt framework from
+  `gokceonur/habanero` Releases that aren't published → 404 → build-from-source.
+- **Resolution:** private fork → source-only distribution (approved by Onur:
+  disable PyPI publish + remove the auto-download).
+- **Fix:**
+  - Removed the "Publish to PyPI" step from `release.yml`. The GitHub Release steps
+    (private + public) still ship `Habanero.framework.zip` as artifacts; `PYPI_TOKEN`
+    is now an unused secret. Updated the stale PyPI mentions in `scripts/release.sh`.
+  - Deleted `habanero/dylib_fetch.py` and both call sites: `__init__._find_dylib`
+    drops the path-4 auto-download (now resolves env-override → packaged `_dylib/` →
+    `make build` output, else `""`); `mcp_build` returns a clear build-from-source
+    error when the dylib is absent instead of attempting a 404-ing download.
+  - Fixed the README Quickstart (`pip install habanero` pulled the wrong PyPI
+    project) → clone + `pip install -e . && make build`; added Xcode to the
+    requirements. Refreshed a stale `pepper-ios on PyPI` comment in `mcp_tools_system.py`.
+  - Added regression test `tools/tests/test_no_prebuilt_distribution.py` (asserts no
+    PyPI publish in `release.yml`, no `dylib_fetch.py`, no `ensure_dylib`/`dylib_fetch`
+    references in the package).
+- **Verified green:** `make build` ok; full `pytest tools/tests` 153 passed (150
+  baseline + 3 new); ruff clean (3 pre-existing `pepper_format.py` E501 only);
+  `import habanero` + `_find_dylib()` resolves the local build path; `make test-deploy`
+  injected on iPhone 15 (E4B5752B, 26.5), `habanero-ctl --port 8869 ping` → `pong`,
+  `look` → full screen dump.

@@ -34,8 +34,8 @@ def register_system_tools(mcp, resolve_and_send, act_and_look):
         # Always use raw dict path so we can inject the MCP server version
         # (lives in Python, the dylib doesn't know it) alongside the dylib
         # status fields. mcp_version lets callers confirm which build of the
-        # tools they're talking to — helpful after upgrading pepper-ios on
-        # PyPI to verify the new code is actually loaded.
+        # tools they're talking to — helpful after upgrading habanero to
+        # verify the new code is actually loaded.
         from .mcp_server import resolve_and_send as raw_send
         from .pepper_format import format_data
 

@@ -6,11 +6,11 @@
 #   1. Validate: on main, clean tree, not already tagged
 #   2. Bump version in pyproject.toml + habanero/__init__.py
 #   3. Create a PR for the version bump, merge it
-#   4. Tag main and push the tag (triggers mirror → release → PyPI via CI)
+#   4. Tag main and push the tag (triggers mirror → release via CI)
 #
 # The CI pipeline handles everything after the tag push:
 #   mirror-code.yml  →  rewrites + pushes to public repo (including tag)
-#   release.yml      →  builds dylib, creates GitHub releases, publishes PyPI
+#   release.yml      →  builds dylib, creates GitHub releases (private + public)
 
 set -euo pipefail
 
@@ -99,6 +99,6 @@ echo ""
 echo "=== Released $TAG ==="
 echo "CI will now run:"
 echo "  1. Mirror → public repo (includes tag)"
-echo "  2. Release → GitHub releases + PyPI"
+echo "  2. Release → GitHub releases (private + public)"
 echo ""
 echo "Monitor: gh run list --workflow=release.yml --limit=1"

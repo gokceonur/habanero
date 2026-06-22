@@ -12,12 +12,13 @@ Works with Claude Code · Cursor · Claude Desktop · any [MCP](https://modelcon
 
 ## Quickstart
 
-Requires macOS 14+, Python 3.10+, and an iOS Simulator runtime.
+Requires macOS 14+, Xcode, Python 3.10+, and an iOS Simulator runtime.
 
 ```bash
-pip install habanero
-habanero-ctl deploy            # inject into the frontmost simulator app
-habanero-ctl look              # see what's on screen
+git clone https://github.com/gokceonur/habanero && cd habanero
+pip install -e . && make build   # editable install + build the dylib from source
+habanero-ctl deploy              # inject into the frontmost simulator app
+habanero-ctl look                # see what's on screen
 ```
 
 Then ask your agent:
