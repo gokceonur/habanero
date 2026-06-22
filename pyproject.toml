@@ -24,9 +24,11 @@ habanero-test = "pepper_ios.test_runner:main"
 [tool.hatch.build.targets.wheel]
 packages = ["pepper_ios"]
 
-# NOTE (habanero fork): upstream force-includes `.claude/skills` into the
-# wheel/sdist to bundle skill-prompts. That path is gitignored and absent from a
-# fresh clone, so it breaks `pip install -e .` and any source build. Dropped here
-# until skill bundling is made build-safe — see BUGS.md "skill-prompt bundling".
-# Runtime already falls back to <repo>/.claude/skills when present, so a clean
-# checkout loses nothing it had before.
+# Skill-prompt sources live in the tracked tree at `pepper_ios/skills/<name>/
+# SKILL.md`, so they are bundled automatically as package data by the `packages`
+# entry above and resolve at runtime via `importlib.resources` (see
+# `mcp_prompts._read_skill`). No `force-include` is needed — and adding one for
+# this same path collides with the default package inclusion. This replaces
+# upstream's `force-include` of the gitignored `.claude/skills` path, which was
+# absent from a fresh clone and broke `pip install -e .` /
+# `pipx install --editable .` — see BUGS.md BUG-001.

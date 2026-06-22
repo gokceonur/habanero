@@ -32,27 +32,6 @@ alone, without the original session's context.
 
 ## Open
 
-### BUG-001 — Source / editable install fails: force-include of gitignored `.claude/skills`
-- **Status:** WORKED-AROUND (proper fix pending)
-- **Severity:** high
-- **Area:** `pyproject.toml`, `pepper_ios/mcp_prompts.py`
-- **Filed:** 2026-06-22
-- **Symptom:** `pip install -e .` / `pipx install --editable .` on a fresh clone
-  aborts with `FileNotFoundError: Forced include not found: <repo>/.claude/skills`.
-- **Repro:** `git clone <fork> && pipx install --editable ./habanero`.
-- **Expected:** a clean checkout installs from source without error.
-- **Notes:** `.claude/` is gitignored (`.gitignore:39`), so `.claude/skills` is
-  absent from any clone, yet `[tool.hatch.build.targets.wheel.force-include]` and
-  the sdist force-include both point at it. Upstream only gets away with it on
-  the PyPI publish path where the dir exists locally. **Workaround applied:** both
-  force-include tables removed from `pyproject.toml`. Consequence: skill-prompts
-  are no longer bundled into a built wheel — `mcp_prompts.py` still falls back to
-  `<repo>/.claude/skills` at runtime, but that path is also gitignored, so
-  skill-prompts are effectively unavailable in this fork until fixed.
-  **Proper fix:** relocate skill sources into the tracked tree (e.g. an in-repo
-  `pepper_ios/skills/` that is committed) and bundle from there, OR un-gitignore
-  just `.claude/skills/`. Then restore the (now build-safe) force-include.
-
 ### BUG-002 — Internal `pepper`/`Pepper` identifiers survive the rebrand (cosmetic + future-coupling)
 - **Status:** OPEN
 - **Severity:** low
@@ -75,4 +54,31 @@ alone, without the original session's context.
 
 ## Fixed
 
-_(none yet)_
+### BUG-001 — Source / editable install fails: force-include of gitignored `.claude/skills`
+- **Status:** FIXED (branch `fix/bug-001-skill-bundling`)
+- **Severity:** high
+- **Area:** `pyproject.toml`, `pepper_ios/mcp_prompts.py`, `pepper_ios/skills/`
+- **Filed:** 2026-06-22
+- **Symptom:** `pip install -e .` / `pipx install --editable .` on a fresh clone
+  aborted with `FileNotFoundError: Forced include not found: <repo>/.claude/skills`.
+- **Repro:** `git clone <fork> && pipx install --editable ./habanero`.
+- **Expected:** a clean checkout installs from source without error.
+- **Notes:** `.claude/` is gitignored (`.gitignore:39`), so `.claude/skills` was
+  absent from any clone, yet `[tool.hatch.build.targets.wheel.force-include]` and
+  the sdist force-include both pointed at it. Upstream only got away with it on
+  the PyPI publish path where the dir exists locally. The prior workaround
+  deleted both force-include tables, which un-broke install but left skill-prompts
+  unbundled — and since `.claude/skills/` was never committed in this fork, the
+  runtime fallback also resolved nothing, so `explore_app` / `babysit` prompts
+  were unavailable.
+- **Fix:** relocated skill sources into the tracked package tree at
+  `pepper_ios/skills/explore-app/SKILL.md` and `pepper_ios/skills/babysit/SKILL.md`.
+  Hatchling bundles them automatically via the existing `packages = ["pepper_ios"]`
+  wheel inclusion (no `force-include` — pointing one at the same in-tree path
+  collides with the default package inclusion and fails the build). `mcp_prompts.
+  _read_skill` already resolves `pepper_ios/skills/<dir>/SKILL.md` via
+  `importlib.resources`, so packaged prompts now load; the `.claude/skills` dev
+  fallback is retained for upstream-layout parity. Added regression test
+  `tools/tests/test_skill_bundling.py` (fails on the unbundled state, passes now).
+  Verified: clean-clone `pipx install --editable` succeeds; a built wheel contains
+  both SKILL.md files; `make py-test` green (150 passed).
