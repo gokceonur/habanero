@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "pepper-ios"
+name = "habanero"
 version = "1.1.7"
-description = "MCP server and CLI tools for Pepper iOS simulator control"
+description = "MCP server and CLI tools for Habanero (a Pepper fork) iOS simulator control"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -17,18 +17,16 @@ dependencies = [
 ]
 
 [project.scripts]
-pepper-mcp = "pepper_ios.mcp_server:main"
-pepper-ctl = "pepper_ios.ctl:main"
-pepper-test = "pepper_ios.test_runner:main"
+habanero-mcp = "pepper_ios.mcp_server:main"
+habanero-ctl = "pepper_ios.ctl:main"
+habanero-test = "pepper_ios.test_runner:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["pepper_ios"]
 
-[tool.hatch.build.targets.wheel.force-include]
-".claude/skills" = "pepper_ios/skills"
-
-# Hatchling excludes dotfiles from sdists by default. Force-include here so
-# the PyPI publish path (python -m build → sdist → wheel-from-sdist) can find
-# the skills when the wheel target's force-include resolves.
-[tool.hatch.build.targets.sdist.force-include]
-".claude/skills" = ".claude/skills"
+# NOTE (habanero fork): upstream force-includes `.claude/skills` into the
+# wheel/sdist to bundle skill-prompts. That path is gitignored and absent from a
+# fresh clone, so it breaks `pip install -e .` and any source build. Dropped here
+# until skill bundling is made build-safe — see BUGS.md "skill-prompt bundling".
+# Runtime already falls back to <repo>/.claude/skills when present, so a clean
+# checkout loses nothing it had before.
