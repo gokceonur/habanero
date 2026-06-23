@@ -147,16 +147,23 @@ def _dd_root(products_dir: str) -> str:
     return os.path.abspath(os.path.join(products_dir, "..", "..", ".."))
 
 
-def _product_framework_names(products_dir: str) -> set[str]:
-    """Names (sans `.framework`) of every framework Xcode copied into products."""
+def _subdirs(path: str) -> list[os.DirEntry[str]]:
+    """Subdirectory entries directly under *path*; empty list if it can't be read."""
     try:
-        return {
-            e.name.removesuffix(".framework")
-            for e in os.scandir(products_dir)
-            if e.is_dir() and e.name.endswith(".framework")
-        }
+        return [e for e in os.scandir(path) if e.is_dir()]
     except OSError:
-        return set()
+        return []
+
+
+def _framework_names(path: str) -> list[str]:
+    """Names (sans `.framework`) of every framework bundle directly under *path*."""
+    return [e.name.removesuffix(".framework") for e in _subdirs(path)
+            if e.name.endswith(".framework")]
+
+
+def _product_framework_names(products_dir: str) -> set[str]:
+    """Frameworks Xcode copied into the products dir — the variants the app links."""
+    return set(_framework_names(products_dir))
 
 
 def _ios_sim_slices(pkg_dir: str) -> list[tuple[str, list[str], str | None]]:
@@ -167,37 +174,16 @@ def _ios_sim_slices(pkg_dir: str) -> list[tuple[str, list[str], str | None]]:
     grabbed tvos-/watchos-/xros- slices (e.g. Sentry's tvOS SentryWithoutUIKit).
     """
     out: list[tuple[str, list[str], str | None]] = []
-    try:
-        name_entries = list(os.scandir(pkg_dir))
-    except OSError:
-        return out
-    for name_entry in name_entries:
-        if not name_entry.is_dir():
-            continue
-        try:
-            xcf_entries = list(os.scandir(name_entry.path))
-        except OSError:
-            continue
-        for xcf_entry in xcf_entries:
-            if not xcf_entry.is_dir() or not xcf_entry.name.endswith(".xcframework"):
+    for name_entry in _subdirs(pkg_dir):
+        for xcf in _subdirs(name_entry.path):
+            if not xcf.name.endswith(".xcframework"):
                 continue
-            try:
-                slice_entries = list(os.scandir(xcf_entry.path))
-            except OSError:
-                continue
-            for s in slice_entries:
-                if not s.is_dir() or not (s.name.startswith("ios-") and s.name.endswith("-simulator")):
+            for s in _subdirs(xcf.path):
+                if not (s.name.startswith("ios-") and s.name.endswith("-simulator")):
                     continue
-                try:
-                    fw_names = [
-                        e.name.removesuffix(".framework")
-                        for e in os.scandir(s.path)
-                        if e.is_dir() and e.name.endswith(".framework")
-                    ]
-                except OSError:
-                    fw_names = []
                 headers = os.path.join(s.path, "Headers")
-                out.append((s.path, fw_names, headers if os.path.isdir(headers) else None))
+                out.append((s.path, _framework_names(s.path),
+                            headers if os.path.isdir(headers) else None))
     return out
 
 
@@ -217,6 +203,10 @@ def _xcframework_sim_search_paths(products_dir: str) -> list[tuple[str | None, s
     `#if __has_include(<SentryWithoutUIKit/…>)` block that, once the variant is
     visible, imports back into Sentry: a cyclic module that aborts the compile
     (BUG-006). Bare-header slices are always kept.
+
+    A statically-linked package leaves no `.framework` in Build/Products, so this
+    rule can't tell which variant it picked and keeps all of them — no worse than
+    before, but such packages aren't covered.
 
     products_dir is .../Build/Products/<Config>-iphonesimulator; SourcePackages
     is a sibling of Build.
@@ -264,17 +254,18 @@ def _generated_modulemaps(products_dir: str) -> list[str]:
         return []
 
 
-def _umbrella_include_dirs(products_dir: str) -> list[str]:
+def _umbrella_include_dirs(modulemaps: list[str]) -> list[str]:
     """Header search roots derived from each generated modulemap's umbrella.
 
-    A generated modulemap names an absolute umbrella header, e.g.
+    Takes the paths from `_generated_modulemaps`. A generated modulemap names an
+    absolute umbrella header, e.g.
     .../firebase-ios-sdk/FirebaseCore/Sources/Public/FirebaseCore/FirebaseCore.h.
     The umbrella then `#import <FirebaseCore/FIRApp.h>`, which resolves only with
     the public-header root (.../Public) on Clang's search path. Returns the
     umbrella's dir and its parent for each modulemap, deduped. Empty when none.
     """
     roots: set[str] = set()
-    for mm in _generated_modulemaps(products_dir):
+    for mm in modulemaps:
         try:
             with open(mm) as f:
                 text = f.read()
@@ -373,9 +364,10 @@ def _swiftc_cmd(
                 cmd.extend(["-F", frame_path])
             if include_path:
                 cmd.extend(["-I", include_path])
-        for modulemap in _generated_modulemaps(module_dir):
+        modulemaps = _generated_modulemaps(module_dir)
+        for modulemap in modulemaps:
             cmd.extend(["-Xcc", f"-fmodule-map-file={modulemap}"])
-        for include_root in _umbrella_include_dirs(module_dir):
+        for include_root in _umbrella_include_dirs(modulemaps):
             cmd.extend(["-Xcc", f"-I{include_root}"])
 
     # Include PepperEvalSDK for Pepper.* API access
@@ -384,6 +376,23 @@ def _swiftc_cmd(
 
     cmd.append(source_path)
     return cmd
+
+
+# swiftc errors that signal app-module *resolution* failure (vs an error in the
+# user's own code), so the fallback retries without the app import only when a retry
+# could actually help — a plain syntax error keeps its real diagnostic instead.
+_MODULE_RESOLUTION_ERRORS = (
+    "cyclic dependency in module",
+    "missing required module",
+    "unable to resolve module",
+    "could not build module",
+    "could not build Objective-C module",
+)
+
+
+def _is_module_resolution_error(error: str) -> bool:
+    """True when *error* looks like app-module resolution failed, not user code."""
+    return any(sig in error for sig in _MODULE_RESOLUTION_ERRORS)
 
 
 def compile_eval(
@@ -457,12 +466,13 @@ def compile_eval(
 
     # Primary attempt: `@testable import <App>` when the app module resolved.
     ok, path_or_err, info = _attempt(with_app_module=True)
-    if ok or not module_name:
+    if ok or not module_name or not _is_module_resolution_error(path_or_err):
         return ok, path_or_err, info
 
-    # Fallback: a few apps link a dependency whose Clang-module graph can't be
-    # reconstructed standalone. Retry without the app import so generic evals — the
+    # Fallback: the app module's Clang graph couldn't be reconstructed standalone (an
+    # unusual binary dependency). Retry without the app import so generic evals — the
     # ones that don't touch the app's own types — still run instead of hard-failing.
+    # A non-resolution failure (e.g. a user syntax error) was already returned above.
     ok_fb, path_fb, info_fb = _attempt(with_app_module=False)
     if ok_fb:
         note = (

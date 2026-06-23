@@ -215,7 +215,7 @@ def test_umbrella_include_dirs_derives_public_header_roots(tmp_path) -> None:
     _touch(gmm, "Pkg.modulemap",
            content=f'module Pkg {{\n  umbrella header "{umbrella}"\n  export *\n}}\n')
 
-    roots = ec._umbrella_include_dirs(products)
+    roots = ec._umbrella_include_dirs(ec._generated_modulemaps(products))
 
     assert pub in roots                   # dir holding the umbrella header
     assert os.path.dirname(pub) in roots  # its parent — the public-header root
@@ -229,7 +229,7 @@ def test_umbrella_include_dirs_skips_nonexistent_dirs(tmp_path) -> None:
     _touch(gmm, "Ghost.modulemap",
            content='module Ghost {\n  umbrella header "/nope/Ghost/Ghost.h"\n}\n')
 
-    assert ec._umbrella_include_dirs(products) == []
+    assert ec._umbrella_include_dirs(ec._generated_modulemaps(products)) == []
 
 
 # ---- BUG-006: compile_eval best-effort fallback (drops the app import on failure) ----
@@ -304,3 +304,28 @@ def test_compile_eval_no_fallback_when_app_import_succeeds(monkeypatch) -> None:
     assert ok is True
     assert len(runs) == 1
     assert info is not None and "WITHOUT" not in info
+
+
+def test_compile_eval_no_fallback_on_user_code_error(monkeypatch) -> None:
+    """A non-resolution failure (e.g. a Swift syntax error) is returned as-is: the
+    fallback only fires for app-module resolution errors, so the user gets the real
+    diagnostic and pays no wasted second compile."""
+    monkeypatch.setattr(ec, "_detect_sdk", _fake_sdk)
+    monkeypatch.setattr(ec, "_find_app_module",
+                        lambda b, s: ("/fake/products", "/fake/products", "FakeApp"))
+
+    runs: list[str] = []
+
+    def run(cmd, capture_output, text, timeout):
+        runs.append(cmd[-1])
+        r = type("R", (), {})()
+        r.returncode, r.stderr, r.stdout = 1, "error: cannot find 'foo' in scope", ""
+        return r
+
+    monkeypatch.setattr(ec.subprocess, "run", run)
+
+    ok, path, info = ec.compile_eval(code="foo", mode="expr", bundle_id="x", scheme="FakeApp")
+
+    assert ok is False
+    assert len(runs) == 1  # no fallback compile for a user code error
+    assert "cannot find 'foo'" in path  # the real diagnostic is surfaced
