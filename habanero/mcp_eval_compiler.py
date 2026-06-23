@@ -204,9 +204,13 @@ def _xcframework_sim_search_paths(products_dir: str) -> list[tuple[str | None, s
     visible, imports back into Sentry: a cyclic module that aborts the compile
     (BUG-006). Bare-header slices are always kept.
 
-    A statically-linked package leaves no `.framework` in Build/Products, so this
-    rule can't tell which variant it picked and keeps all of them — no worse than
-    before, but such packages aren't covered.
+    The skip is package-scoped: once *any* framework of a package is in products,
+    *all* of that package's framework slices are dropped. This assumes a package's
+    xcframework variants are mutually exclusive (true for the -Dynamic / -WithoutX
+    splits this targets); a package shipping several frameworks where only some are
+    copied to products would lose the others. A statically-linked package leaves no
+    `.framework` in Build/Products, so the rule can't tell which variant it picked
+    and keeps all of them — no worse than before, but such packages aren't covered.
 
     products_dir is .../Build/Products/<Config>-iphonesimulator; SourcePackages
     is a sibling of Build.
@@ -257,12 +261,18 @@ def _generated_modulemaps(products_dir: str) -> list[str]:
 def _umbrella_include_dirs(modulemaps: list[str]) -> list[str]:
     """Header search roots derived from each generated modulemap's umbrella.
 
-    Takes the paths from `_generated_modulemaps`. A generated modulemap names an
-    absolute umbrella header, e.g.
-    .../firebase-ios-sdk/FirebaseCore/Sources/Public/FirebaseCore/FirebaseCore.h.
-    The umbrella then `#import <FirebaseCore/FIRApp.h>`, which resolves only with
-    the public-header root (.../Public) on Clang's search path. Returns the
-    umbrella's dir and its parent for each modulemap, deduped. Empty when none.
+    Takes the paths from `_generated_modulemaps`. A generated modulemap names its
+    umbrella as either a header file or a directory (both occur, the directory form
+    is the common one):
+
+        umbrella header ".../FirebaseCore/Sources/Public/FirebaseCore/FirebaseCore.h"
+        umbrella        ".../AppAuth-iOS/Sources/AppAuth"
+
+    Headers under it import siblings as `#import <Module/Other.h>`, which resolves
+    only with the directory that *contains* `Module/` on Clang's search path. The
+    base dir is the header's parent (header form) or the directory itself (directory
+    form); the needed root is the base or its parent, so both are added. Returns
+    those roots, deduped and filtered to ones that exist. Empty when none.
     """
     roots: set[str] = set()
     for mm in modulemaps:
@@ -271,10 +281,11 @@ def _umbrella_include_dirs(modulemaps: list[str]) -> list[str]:
                 text = f.read()
         except OSError:
             continue
-        for m in re.finditer(r'umbrella(?:\s+header)?\s+"([^"]+)"', text):
-            d = os.path.dirname(m.group(1))
-            roots.add(d)
-            roots.add(os.path.dirname(d))
+        for m in re.finditer(r'(?m)^\s*umbrella(\s+header)?\s+"([^"]+)"', text):
+            umbrella = m.group(2)
+            base = os.path.dirname(umbrella) if m.group(1) else umbrella
+            roots.add(base)
+            roots.add(os.path.dirname(base))
     return sorted(p for p in roots if p and os.path.isdir(p))
 
 
@@ -414,8 +425,8 @@ def compile_eval(
     Returns:
         (success, dylib_path_or_error, compile_output)
     """
-    sdk_path, target, arch = _detect_sdk()
-    module_dir, binary_dir, module_name = _find_app_module(bundle_id, scheme)
+    sdk_path, target, _arch = _detect_sdk()
+    module_dir, _binary_dir, module_name = _find_app_module(bundle_id, scheme)
 
     def _attempt(with_app_module: bool) -> tuple[bool, str, str | None]:
         app_import = (
@@ -476,7 +487,7 @@ def compile_eval(
     ok_fb, path_fb, info_fb = _attempt(with_app_module=False)
     if ok_fb:
         note = (
-            f"Compiled WITHOUT `@testable import {module_name}` — the app module "
+            f"⚠ Compiled WITHOUT `@testable import {module_name}` — the app module "
             f"could not be resolved standalone, so the app's own types are "
             f"unavailable in this eval. {info_fb}"
         )

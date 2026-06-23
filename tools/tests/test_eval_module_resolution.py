@@ -163,6 +163,27 @@ def test_xcframework_search_paths_keeps_standalone_binary_framework(tmp_path) ->
     assert frame_paths == [ios]
 
 
+def test_xcframework_search_paths_skip_is_package_scoped(tmp_path) -> None:
+    """The skip is per-package, not global: a package resolved via products has all
+    its variant slices dropped, while an unrelated standalone package in the same
+    tree keeps its framework -F. A global skip would also drop the standalone; no
+    skip would leak the cyclic variant."""
+    dd = str(tmp_path)
+    products = _products_dir(dd, config="Dev")
+    _mk(products, "Sentry.framework")  # the linked sentry-cocoa variant
+    _xcframework_slice(dd, "sentry-cocoa", "Sentry-Dynamic",
+                       "ios-arm64_x86_64-simulator", framework="Sentry")
+    without = _xcframework_slice(dd, "sentry-cocoa", "Sentry-WithoutUIKitOrAppKit",
+                                 "ios-arm64_x86_64-simulator", framework="SentryWithoutUIKit")
+    apollo = _xcframework_slice(dd, "apollo-ios", "Apollo",
+                                "ios-arm64_x86_64-simulator", framework="Apollo")
+
+    frame_paths = [f for f, _ in ec._xcframework_sim_search_paths(products) if f]
+
+    assert frame_paths == [apollo]      # standalone kept, package-scoped skip
+    assert without not in frame_paths   # cyclic variant dropped
+
+
 def test_xcframework_search_paths_keeps_bare_header_slice(tmp_path) -> None:
     """A bare-headers slice (``Headers/`` but no ``.framework``) is returned as an
     ``-I``, independent of the variant-skip rule."""
@@ -232,6 +253,24 @@ def test_umbrella_include_dirs_skips_nonexistent_dirs(tmp_path) -> None:
     assert ec._umbrella_include_dirs(ec._generated_modulemaps(products)) == []
 
 
+def test_umbrella_include_dirs_directory_umbrella_form(tmp_path) -> None:
+    """The `umbrella "<dir>"` form (no `header` keyword) — the common generated form —
+    adds the directory itself and its parent, so both `<Pkg/Other.h>` (needs the
+    parent) and headers directly under the dir resolve. The header-form derivation
+    (dirname of a file) would wrongly drop the directory itself here."""
+    dd = str(tmp_path)
+    products = _products_dir(dd)
+    gmm = _gmm_dir(dd)
+    pub = _mk(dd, "SourcePackages", "checkouts", "appauth", "Sources", "AppAuth")
+    _touch(gmm, "AppAuth.modulemap",
+           content=f'module AppAuth {{\n  umbrella "{pub}"\n  export *\n}}\n')
+
+    roots = ec._umbrella_include_dirs(ec._generated_modulemaps(products))
+
+    assert pub in roots                   # the umbrella directory itself
+    assert os.path.dirname(pub) in roots  # its parent — root for <AppAuth/Other.h>
+
+
 # ---- BUG-006: compile_eval best-effort fallback (drops the app import on failure) ----
 
 
@@ -239,9 +278,9 @@ def _fake_sdk():
     return ("/sdk", "arm64-apple-ios18.0-simulator", "arm64")
 
 
-def _stub_run(returncode: int, *, make_dylib: bool):
-    """Build a subprocess.run stub that reports *returncode* and optionally writes
-    the requested ``-o`` dylib."""
+def _stub_run(returncode: int, *, make_dylib: bool, stderr: str | None = None):
+    """Build a subprocess.run stub that reports *returncode* (with *stderr*, default
+    a module-resolution error on failure) and optionally writes the ``-o`` dylib."""
 
     class _Result:
         pass
@@ -249,7 +288,9 @@ def _stub_run(returncode: int, *, make_dylib: bool):
     def run(cmd, capture_output, text, timeout):
         r = _Result()
         r.returncode = returncode
-        r.stderr = "" if returncode == 0 else "cyclic dependency in module 'Sentry'"
+        r.stderr = stderr if stderr is not None else (
+            "" if returncode == 0 else "cyclic dependency in module 'Sentry'"
+        )
         r.stdout = ""
         if make_dylib:
             with open(cmd[cmd.index("-o") + 1], "w") as fh:
@@ -318,9 +359,8 @@ def test_compile_eval_no_fallback_on_user_code_error(monkeypatch) -> None:
 
     def run(cmd, capture_output, text, timeout):
         runs.append(cmd[-1])
-        r = type("R", (), {})()
-        r.returncode, r.stderr, r.stdout = 1, "error: cannot find 'foo' in scope", ""
-        return r
+        return _stub_run(1, make_dylib=False, stderr="error: cannot find 'foo' in scope")(
+            cmd, capture_output, text, timeout)
 
     monkeypatch.setattr(ec.subprocess, "run", run)
 
