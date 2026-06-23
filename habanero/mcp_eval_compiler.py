@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import subprocess
 import tempfile
 import time
@@ -18,6 +19,10 @@ EVAL_DIR = os.path.join(tempfile.gettempdir(), "pepper-eval")
 _REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _SDK_PATH = os.path.join(_REPO_DIR, "dylib", "eval", "PepperEvalSDK.swift")
 os.makedirs(EVAL_DIR, exist_ok=True)
+
+# swiftc timeout. The first eval against a large app cold-builds its whole Clang
+# module cache (Firebase, Sentry, …), which runs well past the trivial-case ~2s.
+_COMPILE_TIMEOUT = 120
 
 # REPL wrapper template — user writes an expression, we wrap it
 REPL_TEMPLATE = """\
@@ -137,51 +142,149 @@ def _find_app_module(bundle_id: str | None, scheme: str | None) -> tuple[str | N
     return products_dir, products_dir, mod_name
 
 
+def _dd_root(products_dir: str) -> str:
+    """DerivedData root for a products dir (.../Build/Products/<config> → up × 3)."""
+    return os.path.abspath(os.path.join(products_dir, "..", "..", ".."))
+
+
+def _product_framework_names(products_dir: str) -> set[str]:
+    """Names (sans `.framework`) of every framework Xcode copied into products."""
+    try:
+        return {
+            e.name.removesuffix(".framework")
+            for e in os.scandir(products_dir)
+            if e.is_dir() and e.name.endswith(".framework")
+        }
+    except OSError:
+        return set()
+
+
+def _ios_sim_slices(pkg_dir: str) -> list[tuple[str, list[str], str | None]]:
+    """iOS-simulator xcframework slices under one SourcePackages/artifacts/<pkg>.
+
+    Returns (slice_path, framework_names, headers_dir_or_None) per slice. Only
+    `ios-*-simulator` slices are taken — matching any name containing "simulator"
+    grabbed tvos-/watchos-/xros- slices (e.g. Sentry's tvOS SentryWithoutUIKit).
+    """
+    out: list[tuple[str, list[str], str | None]] = []
+    try:
+        name_entries = list(os.scandir(pkg_dir))
+    except OSError:
+        return out
+    for name_entry in name_entries:
+        if not name_entry.is_dir():
+            continue
+        try:
+            xcf_entries = list(os.scandir(name_entry.path))
+        except OSError:
+            continue
+        for xcf_entry in xcf_entries:
+            if not xcf_entry.is_dir() or not xcf_entry.name.endswith(".xcframework"):
+                continue
+            try:
+                slice_entries = list(os.scandir(xcf_entry.path))
+            except OSError:
+                continue
+            for s in slice_entries:
+                if not s.is_dir() or not (s.name.startswith("ios-") and s.name.endswith("-simulator")):
+                    continue
+                try:
+                    fw_names = [
+                        e.name.removesuffix(".framework")
+                        for e in os.scandir(s.path)
+                        if e.is_dir() and e.name.endswith(".framework")
+                    ]
+                except OSError:
+                    fw_names = []
+                headers = os.path.join(s.path, "Headers")
+                out.append((s.path, fw_names, headers if os.path.isdir(headers) else None))
+    return out
+
+
 def _xcframework_sim_search_paths(products_dir: str) -> list[tuple[str | None, str | None]]:
-    """Return (framework_search_path, header_search_path) tuples for every
-    xcframework's simulator slice under SourcePackages/artifacts.
+    """Return (framework_search_path, header_search_path) tuples for the
+    iOS-simulator slice of every xcframework under SourcePackages/artifacts.
 
     Handles both layouts:
     - Framework slice: <slice>/Foo.framework → add <slice> as -F
     - Bare-headers slice: <slice>/Headers/module.modulemap → add <slice>/Headers as -I
 
+    Skips a package's framework slices once Xcode has copied one of that package's
+    frameworks into Build/Products (already on -F). A package such as sentry-cocoa
+    ships several mutually exclusive xcframework variants (Sentry-Dynamic,
+    Sentry-WithoutUIKitOrAppKit, …); the app links exactly one. Exposing the others
+    surfaces modules the app never links — and Sentry's headers guard a
+    `#if __has_include(<SentryWithoutUIKit/…>)` block that, once the variant is
+    visible, imports back into Sentry: a cyclic module that aborts the compile
+    (BUG-006). Bare-header slices are always kept.
+
     products_dir is .../Build/Products/<Config>-iphonesimulator; SourcePackages
     is a sibling of Build.
     """
     results: list[tuple[str | None, str | None]] = []
-    # Navigate up to DerivedData root: .../Build/Products/<config> → parent × 3
-    try:
-        dd_root = os.path.abspath(os.path.join(products_dir, "..", "..", ".."))
-    except Exception:
-        return results
-    artifacts = os.path.join(dd_root, "SourcePackages", "artifacts")
+    artifacts = os.path.join(_dd_root(products_dir), "SourcePackages", "artifacts")
     if not os.path.isdir(artifacts):
         return results
+    product_frameworks = _product_framework_names(products_dir)
     try:
-        for pkg_entry in os.scandir(artifacts):
-            if not pkg_entry.is_dir():
-                continue
-            for name_entry in os.scandir(pkg_entry.path):
-                if not name_entry.is_dir():
-                    continue
-                for xcf_entry in os.scandir(name_entry.path):
-                    if not xcf_entry.is_dir() or not xcf_entry.name.endswith(".xcframework"):
-                        continue
-                    for slice_entry in os.scandir(xcf_entry.path):
-                        if not slice_entry.is_dir() or "simulator" not in slice_entry.name:
-                            continue
-                        slice_path = slice_entry.path
-                        has_framework = any(
-                            e.name.endswith(".framework") for e in os.scandir(slice_path) if e.is_dir()
-                        )
-                        headers = os.path.join(slice_path, "Headers")
-                        has_headers = os.path.isdir(headers)
-                        results.append(
-                            (slice_path if has_framework else None, headers if has_headers else None)
-                        )
+        pkg_entries = list(os.scandir(artifacts))
     except OSError:
-        pass
+        return results
+    for pkg_entry in pkg_entries:
+        if not pkg_entry.is_dir():
+            continue
+        slices = _ios_sim_slices(pkg_entry.path)
+        # Did Xcode already resolve this package by copying a framework to products?
+        package_in_products = any(
+            fw in product_frameworks for _, fw_names, _ in slices for fw in fw_names
+        )
+        for slice_path, fw_names, headers in slices:
+            frame_path = slice_path if (fw_names and not package_in_products) else None
+            if frame_path or headers:
+                results.append((frame_path, headers))
     return results
+
+
+def _generated_modulemaps(products_dir: str) -> list[str]:
+    """Clang modulemaps Xcode generated for the app's SwiftPM Clang targets.
+
+    Live at <DD>/Build/Intermediates.noindex/GeneratedModuleMaps-iphonesimulator/.
+    A standalone `@testable import` of an app that links SwiftPM Clang modules
+    (Firebase, GoogleUtilities, …) fails with `missing required module 'X'` unless
+    each generated modulemap is handed to Clang via -fmodule-map-file. Returns the
+    modulemap paths; empty when the app has none (e.g. PepperTestApp).
+    """
+    gmm = os.path.join(
+        _dd_root(products_dir),
+        "Build", "Intermediates.noindex", "GeneratedModuleMaps-iphonesimulator",
+    )
+    try:
+        return sorted(e.path for e in os.scandir(gmm) if e.name.endswith(".modulemap"))
+    except OSError:
+        return []
+
+
+def _umbrella_include_dirs(products_dir: str) -> list[str]:
+    """Header search roots derived from each generated modulemap's umbrella.
+
+    A generated modulemap names an absolute umbrella header, e.g.
+    .../firebase-ios-sdk/FirebaseCore/Sources/Public/FirebaseCore/FirebaseCore.h.
+    The umbrella then `#import <FirebaseCore/FIRApp.h>`, which resolves only with
+    the public-header root (.../Public) on Clang's search path. Returns the
+    umbrella's dir and its parent for each modulemap, deduped. Empty when none.
+    """
+    roots: set[str] = set()
+    for mm in _generated_modulemaps(products_dir):
+        try:
+            with open(mm) as f:
+                text = f.read()
+        except OSError:
+            continue
+        for m in re.finditer(r'umbrella(?:\s+header)?\s+"([^"]+)"', text):
+            d = os.path.dirname(m.group(1))
+            roots.add(d)
+            roots.add(os.path.dirname(d))
+    return sorted(p for p in roots if p and os.path.isdir(p))
 
 
 def _sim_products_dirs(base: str) -> list[str]:
@@ -219,6 +322,70 @@ def _find_all_products_dirs(dd_root: str) -> list[str]:
     return results
 
 
+def _swiftc_cmd(
+    source_path: str,
+    dylib_path: str,
+    sdk_path: str,
+    target: str,
+    module_dir: str | None,
+) -> list[str]:
+    """Assemble the swiftc invocation that compiles an eval source into a dylib.
+
+    With module_dir set, adds the search paths and Clang module-graph flags that
+    let the source `@testable import` the app module and resolve its transitive
+    SwiftPM/xcframework dependencies. Pass module_dir=None to compile without the
+    app import (the fallback path).
+    """
+    cmd = [
+        "xcrun", "-sdk", "iphonesimulator", "swiftc",
+        "-target", target,
+        "-sdk", sdk_path,
+        "-emit-library",
+        "-o", dylib_path,
+        "-Onone",
+        "-enable-testing",
+        "-framework", "UIKit",
+        "-framework", "Foundation",
+        "-framework", "SwiftUI",
+    ]
+
+    # Allow unresolved symbols — they'll resolve at dlopen time from the host process
+    cmd.extend(["-Xlinker", "-undefined", "-Xlinker", "dynamic_lookup"])
+
+    # Resolve the app module and its transitive dependency graph. `@testable import`
+    # of the app pulls in everything it links, which swiftc must resolve or the
+    # compile fails ("missing required module 'X'"). SPM ships deps in several
+    # layouts, so fan out:
+    #   -I/-F <products>                standalone .swiftmodule + framework products
+    #   -F <products>/PackageFrameworks SPM-built framework products
+    #   -F <slice> / -I <slice>/Headers xcframework iOS-sim slices
+    #   -Xcc -fmodule-map-file=<map>    Xcode-generated Clang modulemaps (Firebase, …)
+    #   -Xcc -I<root>                   public-header roots those modulemaps include
+    # The last two reconstruct the explicit Clang-module graph Xcode builds; without
+    # them an app linking SwiftPM Clang modules fails to compile standalone (BUG-006).
+    if module_dir:
+        cmd.extend(["-I", module_dir, "-F", module_dir])
+        package_fw = os.path.join(module_dir, "PackageFrameworks")
+        if os.path.isdir(package_fw):
+            cmd.extend(["-F", package_fw])
+        for frame_path, include_path in _xcframework_sim_search_paths(module_dir):
+            if frame_path:
+                cmd.extend(["-F", frame_path])
+            if include_path:
+                cmd.extend(["-I", include_path])
+        for modulemap in _generated_modulemaps(module_dir):
+            cmd.extend(["-Xcc", f"-fmodule-map-file={modulemap}"])
+        for include_root in _umbrella_include_dirs(module_dir):
+            cmd.extend(["-Xcc", f"-I{include_root}"])
+
+    # Include PepperEvalSDK for Pepper.* API access
+    if os.path.exists(_SDK_PATH):
+        cmd.append(_SDK_PATH)
+
+    cmd.append(source_path)
+    return cmd
+
+
 def compile_eval(
     code: str,
     mode: str = "expr",
@@ -239,104 +406,73 @@ def compile_eval(
         (success, dylib_path_or_error, compile_output)
     """
     sdk_path, target, arch = _detect_sdk()
-
-    # Find app module for import
     module_dir, binary_dir, module_name = _find_app_module(bundle_id, scheme)
-    app_import = f"@testable import {module_name}" if module_name else ""
 
-    # Generate source
-    if mode == "expr":
-        source = REPL_TEMPLATE.format(app_import=app_import, code=code)
-    else:
-        # Indent user code for the function body
-        indented = "\n".join("    " + line for line in code.splitlines())
-        source = FULL_TEMPLATE.format(app_import=app_import, code=indented)
+    def _attempt(with_app_module: bool) -> tuple[bool, str, str | None]:
+        app_import = (
+            f"@testable import {module_name}" if (with_app_module and module_name) else ""
+        )
+        if mode == "expr":
+            source = REPL_TEMPLATE.format(app_import=app_import, code=code)
+        else:
+            indented = "\n".join("    " + line for line in code.splitlines())
+            source = FULL_TEMPLATE.format(app_import=app_import, code=indented)
 
-    # Unique name based on content hash + timestamp
-    code_hash = hashlib.md5(source.encode()).hexdigest()[:8]
-    timestamp = int(time.time() * 1000) % 100000
-    dylib_name = f"pepper_eval_{code_hash}_{timestamp}"
+        # Unique name based on content hash + timestamp
+        code_hash = hashlib.md5(source.encode()).hexdigest()[:8]
+        timestamp = int(time.time() * 1000) % 100000
+        dylib_name = f"pepper_eval_{code_hash}_{timestamp}"
+        source_path = os.path.join(EVAL_DIR, f"{dylib_name}.swift")
+        dylib_path = os.path.join(EVAL_DIR, f"{dylib_name}.dylib")
+        with open(source_path, "w") as f:
+            f.write(source)
 
-    source_path = os.path.join(EVAL_DIR, f"{dylib_name}.swift")
-    dylib_path = os.path.join(EVAL_DIR, f"{dylib_name}.dylib")
+        cmd = _swiftc_cmd(
+            source_path, dylib_path, sdk_path, target,
+            module_dir if with_app_module else None,
+        )
+        start = time.time()
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=_COMPILE_TIMEOUT)
+        elapsed_ms = int((time.time() - start) * 1000)
 
-    # Write source
-    with open(source_path, "w") as f:
-        f.write(source)
+        if result.returncode != 0:
+            error_output = result.stderr.strip() or result.stdout.strip()
+            # Clean up error paths for readability
+            error_output = error_output.replace(EVAL_DIR + "/", "")
+            return False, f"Compilation failed ({elapsed_ms}ms):\n{error_output}", None
 
-    # Build swiftc command
-    cmd = [
-        "xcrun", "-sdk", "iphonesimulator", "swiftc",
-        "-target", target,
-        "-sdk", sdk_path,
-        "-emit-library",
-        "-o", dylib_path,
-        "-Onone",
-        "-enable-testing",
-        "-framework", "UIKit",
-        "-framework", "Foundation",
-        "-framework", "SwiftUI",
-    ]
+        if not os.path.exists(dylib_path):
+            return False, "Compiler returned success but dylib not found", None
 
-    # Allow unresolved symbols — they'll resolve at dlopen time from the host process
-    cmd.extend(["-Xlinker", "-undefined", "-Xlinker", "dynamic_lookup"])
+        dylib_size = os.path.getsize(dylib_path)
+        final_path = dylib_path
+        # If sim_udid provided, copy to simulator's tmp dir for accessibility
+        if sim_udid:
+            sim_tmp = _sim_tmp_dir(sim_udid)
+            if sim_tmp:
+                sim_dylib = os.path.join(sim_tmp, f"{dylib_name}.dylib")
+                subprocess.run(["cp", dylib_path, sim_dylib], check=True)
+                final_path = sim_dylib
+        return True, final_path, f"Compiled in {elapsed_ms}ms ({dylib_size} bytes)"
 
-    # Add app module and dependency search paths. @testable import of the app
-    # module pulls in its transitive imports — Lottie, GoogleMaps, etc. —
-    # which swiftc must be able to resolve, or compilation fails with
-    # "missing required module 'X'". SPM packages ship in several layouts,
-    # so we pass a fan-out of search paths:
-    #   -I <products>                   standalone .swiftmodule dirs
-    #   -F <products>                   framework products (Apollo, etc.)
-    #   -F <products>/PackageFrameworks SPM-built framework products
-    #   -F <slice>                      xcframework sim slices with .framework
-    #   -I <slice>/Headers              xcframework sim slices with bare headers
-    # Slice paths come from walking SourcePackages/artifacts/*/*/*.xcframework/
-    # and picking directories whose name contains "simulator".
-    if module_dir:
-        cmd.extend(["-I", module_dir])
-        cmd.extend(["-F", module_dir])
-        package_fw = os.path.join(module_dir, "PackageFrameworks")
-        if os.path.isdir(package_fw):
-            cmd.extend(["-F", package_fw])
-        for frame_path, include_path in _xcframework_sim_search_paths(module_dir):
-            if frame_path:
-                cmd.extend(["-F", frame_path])
-            if include_path:
-                cmd.extend(["-I", include_path])
+    # Primary attempt: `@testable import <App>` when the app module resolved.
+    ok, path_or_err, info = _attempt(with_app_module=True)
+    if ok or not module_name:
+        return ok, path_or_err, info
 
-    # Include PepperEvalSDK for Pepper.* API access
-    if os.path.exists(_SDK_PATH):
-        cmd.append(_SDK_PATH)
-
-    cmd.append(source_path)
-
-    # Compile
-    start = time.time()
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-    elapsed_ms = int((time.time() - start) * 1000)
-
-    if result.returncode != 0:
-        error_output = result.stderr.strip() or result.stdout.strip()
-        # Clean up error paths for readability
-        error_output = error_output.replace(EVAL_DIR + "/", "")
-        return False, f"Compilation failed ({elapsed_ms}ms):\n{error_output}", None
-
-    # Verify dylib was created
-    if not os.path.exists(dylib_path):
-        return False, "Compiler returned success but dylib not found", None
-
-    dylib_size = os.path.getsize(dylib_path)
-
-    # If sim_udid provided, copy to simulator's tmp dir for accessibility
-    if sim_udid:
-        sim_tmp = _sim_tmp_dir(sim_udid)
-        if sim_tmp:
-            sim_dylib = os.path.join(sim_tmp, f"{dylib_name}.dylib")
-            subprocess.run(["cp", dylib_path, sim_dylib], check=True)
-            dylib_path = sim_dylib
-
-    return True, dylib_path, f"Compiled in {elapsed_ms}ms ({dylib_size} bytes)"
+    # Fallback: a few apps link a dependency whose Clang-module graph can't be
+    # reconstructed standalone. Retry without the app import so generic evals — the
+    # ones that don't touch the app's own types — still run instead of hard-failing.
+    ok_fb, path_fb, info_fb = _attempt(with_app_module=False)
+    if ok_fb:
+        note = (
+            f"Compiled WITHOUT `@testable import {module_name}` — the app module "
+            f"could not be resolved standalone, so the app's own types are "
+            f"unavailable in this eval. {info_fb}"
+        )
+        return True, path_fb, note
+    # Both failed: the with-import error is the informative one — return it.
+    return ok, path_or_err, info
 
 
 def _sim_tmp_dir(udid: str) -> str | None:
